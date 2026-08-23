@@ -108,7 +108,7 @@ export default function AppShell() {
   const [loadingData, setLoadingData] = useState(false);
   const [globalError, setGlobalError] = useState("");
   const [notice, setNotice] = useState("");
-  const [tab, setTab] = useState<MainTab>("overview");
+  const [tab, setTab] = useState<MainTab>("characters");
   const [selectedCurrency, setSelectedCurrency] = useState<Currency>("adena");
   const [selectedCharacterId, setSelectedCharacterId] = useState("");
   const [modal, setModal] = useState<ModalState>(null);
@@ -158,8 +158,8 @@ export default function AppShell() {
     [characters]
   );
   const selectedCharacter = useMemo(
-    () => characters.find((character) => character.id === selectedCharacterId) ?? activeCharacters[0] ?? characters[0] ?? null,
-    [activeCharacters, characters, selectedCharacterId]
+    () => characters.find((character) => character.id === selectedCharacterId) ?? null,
+    [characters, selectedCharacterId]
   );
 
   async function reloadWithNotice(message?: string) {
@@ -246,11 +246,11 @@ export default function AppShell() {
       </header>
 
       <nav className="tabs" aria-label="Основная навигация">
-        <button className={tab === "overview" ? "tab-btn active" : "tab-btn"} type="button" onClick={() => setTab("overview")}>
-          Обзор
-        </button>
         <button className={tab === "characters" ? "tab-btn active" : "tab-btn"} type="button" onClick={() => setTab("characters")}>
           Персонажи
+        </button>
+        <button className={tab === "overview" ? "tab-btn active" : "tab-btn"} type="button" onClick={() => setTab("overview")}>
+          Обзор
         </button>
         <button className={tab === "history" ? "tab-btn active" : "tab-btn"} type="button" onClick={() => setTab("history")}>
           История
@@ -261,23 +261,22 @@ export default function AppShell() {
       {notice ? <div className="ok notice">{notice}</div> : null}
       {loadingData ? <div className="small">Загружаем данные...</div> : null}
 
-      {tab === "overview" ? (
-        <Overview
+      {tab === "characters" ? (
+        <CharactersListScreen
           characters={activeCharacters}
           selectedCurrency={selectedCurrency}
           setSelectedCurrency={setSelectedCurrency}
           timezone={timezone}
           onOpenCharacter={(character) => {
             setSelectedCharacterId(character.id);
-            setTab("characters");
+            setTab("overview");
           }}
           onCreateCharacter={handleCreateCharacter}
         />
       ) : null}
 
-      {tab === "characters" ? (
-        <CharactersScreen
-          characters={characters}
+      {tab === "overview" ? (
+        <CharacterOverviewScreen
           selectedCharacter={selectedCharacter}
           selectedCurrency={selectedCurrency}
           setSelectedCurrency={setSelectedCurrency}
@@ -308,7 +307,7 @@ export default function AppShell() {
             await saveOperation(currentUser.uid, character, period, input, operationId);
             await reloadWithNotice(operationId ? "Операция обновлена." : "Операция добавлена.");
           }}
-          onCreateCharacter={handleCreateCharacter}
+          onGoToCharacters={() => setTab("characters")}
         />
       ) : null}
 
@@ -521,7 +520,7 @@ function AuthGate() {
   );
 }
 
-function Overview({
+function CharactersListScreen({
   characters,
   selectedCurrency,
   setSelectedCurrency,
@@ -539,7 +538,6 @@ function Overview({
   const [sortKey, setSortKey] = useState<SortKey>("nickname");
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
   const [isCharacterFormOpen, setIsCharacterFormOpen] = useState(false);
-  const totals = useMemo(() => calculateDashboardTotals(characters), [characters]);
   const rows = useMemo(() => {
     const prepared = characters.map((character) => {
       const period = getOpenPeriod(character);
@@ -593,113 +591,100 @@ function Overview({
   }
 
   return (
-    <>
-      <section className="card">
-        <div className="card-head">
-          <div>
-            <h2>Общий обзор</h2>
-            <p className="subtitle">Активные персонажи и текущая неделя.</p>
-          </div>
+    <section className="card">
+      <div className="card-head">
+        <div>
+          <h2>Персонажи</h2>
+          <span className="small">Выберите персонажа, чтобы открыть его обзор и операции.</span>
         </div>
-        <CurrencyTabs value={selectedCurrency} onChange={setSelectedCurrency} />
-        <SummaryStats balances={totals.balances} summary={totals.summary} selectedCurrency={selectedCurrency} />
-      </section>
-
-      <section className="card">
-        <div className="card-head">
-          <div>
-            <h2>Персонажи</h2>
-            <span className="small">Валюта таблицы: {currencyLabels[selectedCurrency]}</span>
-          </div>
-          <div className="button-row section-actions">
-            <button
-              className={isCharacterFormOpen ? "secondary active-secondary" : "secondary"}
-              type="button"
-              onClick={() => setIsCharacterFormOpen((isOpen) => !isOpen)}
-            >
-              <Plus size={15} />
-              Добавить персонажа
-            </button>
-          </div>
+        <div className="button-row section-actions">
+          <CurrencyTabs value={selectedCurrency} onChange={setSelectedCurrency} compact />
+          <button
+            className={isCharacterFormOpen ? "secondary active-secondary" : "secondary"}
+            type="button"
+            onClick={() => setIsCharacterFormOpen((isOpen) => !isOpen)}
+          >
+            <Plus size={15} />
+            Добавить персонажа
+          </button>
         </div>
-        {isCharacterFormOpen ? (
-          <InlineCharacterForm
-            onCancel={() => setIsCharacterFormOpen(false)}
-            onSubmit={async (input) => {
-              await onCreateCharacter(input);
-              setIsCharacterFormOpen(false);
-            }}
-          />
-        ) : null}
-        {characters.length === 0 ? (
-          <EmptyState text="Добавьте первого персонажа и укажите его текущие остатки, чтобы начать учёт." />
-        ) : (
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <SortableTh active={sortKey === "nickname"} direction={sortDirection} onClick={() => toggleSort("nickname")}>
-                    Персонаж
-                  </SortableTh>
-                  <SortableTh active={sortKey === "balance"} direction={sortDirection} onClick={() => toggleSort("balance")} alignRight>
-                    Текущий остаток
-                  </SortableTh>
-                  <SortableTh active={sortKey === "interval"} direction={sortDirection} onClick={() => toggleSort("interval")} alignRight>
-                    Сегодня/интервал
-                  </SortableTh>
-                  <SortableTh active={sortKey === "week"} direction={sortDirection} onClick={() => toggleSort("week")} alignRight>
-                    Текущая неделя
-                  </SortableTh>
-                  <SortableTh active={sortKey === "expenses"} direction={sortDirection} onClick={() => toggleSort("expenses")} alignRight>
-                    Расходы недели
-                  </SortableTh>
-                  <SortableTh active={sortKey === "specialIncome"} direction={sortDirection} onClick={() => toggleSort("specialIncome")} alignRight>
-                    Крупные поступления
-                  </SortableTh>
-                  <SortableTh active={sortKey === "lastSnapshotAt"} direction={sortDirection} onClick={() => toggleSort("lastSnapshotAt")}>
-                    Последний остаток
-                  </SortableTh>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map(({ character, period, summary, lastInterval }) => {
-                  const hasUncounted = period ? hasOperationsAfterLastSnapshot(period.snapshots, period.operations) : false;
-                  const net = summary?.[selectedCurrency].netResult ?? 0;
-                  const intervalNet = lastInterval?.summary[selectedCurrency].netResult ?? 0;
+      </div>
+      {isCharacterFormOpen ? (
+        <InlineCharacterForm
+          onCancel={() => setIsCharacterFormOpen(false)}
+          onSubmit={async (input) => {
+            await onCreateCharacter(input);
+            setIsCharacterFormOpen(false);
+          }}
+        />
+      ) : null}
+      {characters.length === 0 ? (
+        <EmptyState text="Добавьте первого персонажа и укажите его текущие остатки, чтобы начать учёт." />
+      ) : (
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <SortableTh active={sortKey === "nickname"} direction={sortDirection} onClick={() => toggleSort("nickname")}>
+                  Персонаж
+                </SortableTh>
+                <SortableTh active={sortKey === "balance"} direction={sortDirection} onClick={() => toggleSort("balance")} alignRight>
+                  Текущий остаток
+                </SortableTh>
+                <SortableTh active={sortKey === "interval"} direction={sortDirection} onClick={() => toggleSort("interval")} alignRight>
+                  Сегодня/интервал
+                </SortableTh>
+                <SortableTh active={sortKey === "week"} direction={sortDirection} onClick={() => toggleSort("week")} alignRight>
+                  Текущая неделя
+                </SortableTh>
+                <SortableTh active={sortKey === "expenses"} direction={sortDirection} onClick={() => toggleSort("expenses")} alignRight>
+                  Расходы недели
+                </SortableTh>
+                <SortableTh active={sortKey === "specialIncome"} direction={sortDirection} onClick={() => toggleSort("specialIncome")} alignRight>
+                  Крупные поступления
+                </SortableTh>
+                <SortableTh active={sortKey === "lastSnapshotAt"} direction={sortDirection} onClick={() => toggleSort("lastSnapshotAt")}>
+                  Последний остаток
+                </SortableTh>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map(({ character, period, summary, lastInterval }) => {
+                const hasUncounted = period ? hasOperationsAfterLastSnapshot(period.snapshots, period.operations) : false;
+                const net = summary?.[selectedCurrency].netResult ?? 0;
+                const intervalNet = lastInterval?.summary[selectedCurrency].netResult ?? 0;
 
-                  return (
-                    <tr key={character.id}>
-                      <td>
-                        <button className="link-btn" type="button" onClick={() => onOpenCharacter(character)}>
-                          {character.nickname}
-                        </button>
-                        {character.server ? <div className="small">{character.server}</div> : null}
-                      </td>
-                      <td className="num-cell" title={formatInteger(character.currentBalances[selectedCurrency])}>
-                        {formatInteger(character.currentBalances[selectedCurrency])}
-                      </td>
-                      <td className={`num-cell ${resultClassName(intervalNet)}`}>{lastInterval ? formatSignedInteger(intervalNet) : "—"}</td>
-                      <td className={`num-cell ${resultClassName(net)}`}>{summary ? formatSignedInteger(net) : "—"}</td>
-                      <td className="num-cell">{summary ? formatInteger(summary[selectedCurrency].expenses) : "—"}</td>
-                      <td className="num-cell">{summary ? formatInteger(summary[selectedCurrency].specialIncome) : "—"}</td>
-                      <td>
-                        <span className={hasUncounted ? "pill amber" : "date-cell"}>{formatDateTime(character.lastSnapshotAt)}</span>
-                        {hasUncounted ? <div className="small">Есть операции после остатка</div> : null}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
-    </>
+                return (
+                  <tr key={character.id}>
+                    <td>
+                      <button className="link-btn" type="button" onClick={() => onOpenCharacter(character)}>
+                        {character.nickname}
+                      </button>
+                      {character.server ? <div className="small">{character.server}</div> : null}
+                    </td>
+                    <td className="num-cell" title={formatInteger(character.currentBalances[selectedCurrency])}>
+                      {formatInteger(character.currentBalances[selectedCurrency])}
+                    </td>
+                    <td className={`num-cell ${resultClassName(intervalNet)}`}>{lastInterval ? formatSignedInteger(intervalNet) : "—"}</td>
+                    <td className={`num-cell ${resultClassName(net)}`}>{summary ? formatSignedInteger(net) : "—"}</td>
+                    <td className="num-cell">{summary ? formatInteger(summary[selectedCurrency].expenses) : "—"}</td>
+                    <td className="num-cell">{summary ? formatInteger(summary[selectedCurrency].specialIncome) : "—"}</td>
+                    <td>
+                      <span className={hasUncounted ? "pill amber" : "date-cell"}>{formatDateTime(character.lastSnapshotAt)}</span>
+                      {hasUncounted ? <div className="small">Есть операции после остатка</div> : null}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
   );
 }
 
-function CharactersScreen({
-  characters,
+function CharacterOverviewScreen({
   selectedCharacter,
   selectedCurrency,
   setSelectedCurrency,
@@ -709,9 +694,8 @@ function CharactersScreen({
   onDelete,
   onDeleteOperation,
   onSaveOperation,
-  onCreateCharacter
+  onGoToCharacters
 }: {
-  characters: CharacterRecord[];
   selectedCharacter: CharacterRecord | null;
   selectedCurrency: Currency;
   setSelectedCurrency: (currency: Currency) => void;
@@ -721,37 +705,37 @@ function CharactersScreen({
   onDelete: (character: CharacterRecord) => Promise<void>;
   onDeleteOperation: (character: CharacterRecord, period: PeriodRecord, operation: OperationRecord) => Promise<void>;
   onSaveOperation: (character: CharacterRecord, period: PeriodRecord, input: OperationFormInput, operationId?: string) => Promise<void>;
-  onCreateCharacter: (input: CharacterFormInput) => Promise<void>;
+  onGoToCharacters: () => void;
 }) {
-  if (characters.length === 0) {
+  if (!selectedCharacter) {
     return (
       <section className="card">
         <div className="card-head">
-          <h2>Персонажи</h2>
+          <div>
+            <h2>Выберите персонажа</h2>
+            <p className="subtitle">Операции, остатки и расчёт появятся после выбора персонажа во вкладке «Персонажи».</p>
+          </div>
+          <button className="secondary" type="button" onClick={onGoToCharacters}>
+            Перейти к персонажам
+          </button>
         </div>
-        <p className="subtitle">Добавьте первого персонажа и укажите его текущие остатки, чтобы начать учёт.</p>
-        <InlineCharacterForm onSubmit={onCreateCharacter} />
       </section>
     );
   }
 
   return (
-    <>
-      {selectedCharacter ? (
-        <CharacterDetail
-          key={selectedCharacter.id}
-          character={selectedCharacter}
-          selectedCurrency={selectedCurrency}
-          setSelectedCurrency={setSelectedCurrency}
-          setModal={setModal}
-          timezone={timezone}
-          onArchive={onArchive}
-          onDelete={onDelete}
-          onDeleteOperation={onDeleteOperation}
-          onSaveOperation={onSaveOperation}
-        />
-      ) : null}
-    </>
+    <CharacterDetail
+      key={selectedCharacter.id}
+      character={selectedCharacter}
+      selectedCurrency={selectedCurrency}
+      setSelectedCurrency={setSelectedCurrency}
+      setModal={setModal}
+      timezone={timezone}
+      onArchive={onArchive}
+      onDelete={onDelete}
+      onDeleteOperation={onDeleteOperation}
+      onSaveOperation={onSaveOperation}
+    />
   );
 }
 
@@ -2039,62 +2023,6 @@ function IconButton({
       {children}
     </button>
   );
-}
-
-function calculateDashboardTotals(characters: CharacterRecord[]): { balances: Record<Currency, number>; summary: PeriodSummary } {
-  const totals = {
-    balances: { adena: 0, lCoin: 0 },
-    summary: {
-      adena: {
-        openingBalance: 0,
-        closingBalance: 0,
-        expenses: 0,
-        specialIncome: 0,
-        grossEarned: 0,
-        regularFarm: 0,
-        netResult: 0
-      },
-      lCoin: {
-        openingBalance: 0,
-        closingBalance: 0,
-        expenses: 0,
-        specialIncome: 0,
-        grossEarned: 0,
-        regularFarm: 0,
-        netResult: 0
-      },
-      accountedDays: 0,
-      actualDurationHours: 0
-    }
-  };
-
-  for (const character of characters) {
-    totals.balances.adena += character.currentBalances.adena;
-    totals.balances.lCoin += character.currentBalances.lCoin;
-
-    const period = getOpenPeriod(character);
-
-    if (!period) {
-      continue;
-    }
-
-    const summary = calculatePeriodSummary(period.snapshots, period.operations);
-
-    for (const currency of currencies) {
-      totals.summary[currency].openingBalance += summary[currency].openingBalance;
-      totals.summary[currency].closingBalance += summary[currency].closingBalance;
-      totals.summary[currency].expenses += summary[currency].expenses;
-      totals.summary[currency].specialIncome += summary[currency].specialIncome;
-      totals.summary[currency].grossEarned += summary[currency].grossEarned;
-      totals.summary[currency].regularFarm += summary[currency].regularFarm;
-      totals.summary[currency].netResult += summary[currency].netResult;
-    }
-
-    totals.summary.accountedDays += summary.accountedDays;
-    totals.summary.actualDurationHours += summary.actualDurationHours;
-  }
-
-  return totals;
 }
 
 function formatPendingOperationsNote(period: PeriodRecord, selectedCurrency: Currency): string {
