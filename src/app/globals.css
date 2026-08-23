@@ -388,6 +388,22 @@ h2 {
   flex: 1 1 170px;
 }
 
+.compact-character-name {
+  flex: 1 1 170px;
+}
+
+.compact-character-server {
+  flex: 0 0 128px;
+}
+
+.compact-balance {
+  flex: 0 0 150px;
+}
+
+.compact-date {
+  flex: 0 0 184px;
+}
+
 .inline-operation-row input,
 .inline-operation-row select {
   width: 100%;
@@ -711,6 +727,10 @@ tr:hover td {
   .compact-currency,
   .compact-category,
   .compact-comment,
+  .compact-character-name,
+  .compact-character-server,
+  .compact-balance,
+  .compact-date,
   .inline-operation-row .amount-input {
     width: 100%;
     flex-basis: auto;

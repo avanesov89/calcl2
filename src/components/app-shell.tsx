@@ -89,6 +89,13 @@ type OperationFormInput = {
   occurredAt: Date;
 };
 
+type CharacterFormInput = {
+  nickname: string;
+  server?: string;
+  initialBalances: { adena: number; lCoin: number };
+  capturedAt: Date;
+};
+
 const expenseCategories = ["руда", "заряды души", "банки/расходники", "телепорты", "экипировка", "комиссия", "другое"];
 const specialIncomeCategories = ["продажа крупного дропа", "продажа предмета", "награда", "другое"];
 
@@ -181,6 +188,16 @@ export default function AppShell() {
     await signOut(firebaseAuth);
   }
 
+  async function handleCreateCharacter(input: CharacterFormInput) {
+    if (!currentUser) {
+      return;
+    }
+
+    const id = await createCharacter(currentUser.uid, input);
+    setSelectedCharacterId(id);
+    await reloadWithNotice("Персонаж добавлен.");
+  }
+
   if (!hasFirebaseConfig) {
     return (
       <GateCard title="Firebase не настроен">
@@ -249,12 +266,12 @@ export default function AppShell() {
           characters={activeCharacters}
           selectedCurrency={selectedCurrency}
           setSelectedCurrency={setSelectedCurrency}
-          setModal={setModal}
           timezone={timezone}
           onOpenCharacter={(character) => {
             setSelectedCharacterId(character.id);
             setTab("characters");
           }}
+          onCreateCharacter={handleCreateCharacter}
         />
       ) : null}
 
@@ -291,6 +308,7 @@ export default function AppShell() {
             await saveOperation(currentUser.uid, character, period, input, operationId);
             await reloadWithNotice(operationId ? "Операция обновлена." : "Операция добавлена.");
           }}
+          onCreateCharacter={handleCreateCharacter}
         />
       ) : null}
 
@@ -318,9 +336,7 @@ export default function AppShell() {
                   await updateCharacter(currentUser.uid, modal.character, input);
                   await reloadWithNotice("Персонаж обновлён.");
                 } else {
-                  const id = await createCharacter(currentUser.uid, input);
-                  setSelectedCharacterId(id);
-                  await reloadWithNotice("Персонаж добавлен.");
+                  await handleCreateCharacter(input);
                 }
 
                 setModal(null);
@@ -509,19 +525,20 @@ function Overview({
   characters,
   selectedCurrency,
   setSelectedCurrency,
-  setModal,
   timezone,
-  onOpenCharacter
+  onOpenCharacter,
+  onCreateCharacter
 }: {
   characters: CharacterRecord[];
   selectedCurrency: Currency;
   setSelectedCurrency: (currency: Currency) => void;
-  setModal: (modal: ModalState) => void;
   timezone: string;
   onOpenCharacter: (character: CharacterRecord) => void;
+  onCreateCharacter: (input: CharacterFormInput) => Promise<void>;
 }) {
   const [sortKey, setSortKey] = useState<SortKey>("nickname");
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
+  const [isCharacterFormOpen, setIsCharacterFormOpen] = useState(false);
   const totals = useMemo(() => calculateDashboardTotals(characters), [characters]);
   const rows = useMemo(() => {
     const prepared = characters.map((character) => {
@@ -583,10 +600,6 @@ function Overview({
             <h2>Общий обзор</h2>
             <p className="subtitle">Активные персонажи и текущая неделя.</p>
           </div>
-          <button type="button" onClick={() => setModal({ type: "character" })}>
-            <Plus size={15} />
-            Добавить персонажа
-          </button>
         </div>
         <CurrencyTabs value={selectedCurrency} onChange={setSelectedCurrency} />
         <SummaryStats balances={totals.balances} summary={totals.summary} selectedCurrency={selectedCurrency} />
@@ -594,15 +607,32 @@ function Overview({
 
       <section className="card">
         <div className="card-head">
-          <h2>Персонажи</h2>
-          <span className="small">Валюта таблицы: {currencyLabels[selectedCurrency]}</span>
+          <div>
+            <h2>Персонажи</h2>
+            <span className="small">Валюта таблицы: {currencyLabels[selectedCurrency]}</span>
+          </div>
+          <div className="button-row section-actions">
+            <button
+              className={isCharacterFormOpen ? "secondary active-secondary" : "secondary"}
+              type="button"
+              onClick={() => setIsCharacterFormOpen((isOpen) => !isOpen)}
+            >
+              <Plus size={15} />
+              Добавить персонажа
+            </button>
+          </div>
         </div>
-        {characters.length === 0 ? (
-          <EmptyState
-            text="Добавьте первого персонажа и укажите его текущие остатки, чтобы начать учёт."
-            action="Добавить персонажа"
-            onAction={() => setModal({ type: "character" })}
+        {isCharacterFormOpen ? (
+          <InlineCharacterForm
+            onCancel={() => setIsCharacterFormOpen(false)}
+            onSubmit={async (input) => {
+              await onCreateCharacter(input);
+              setIsCharacterFormOpen(false);
+            }}
           />
+        ) : null}
+        {characters.length === 0 ? (
+          <EmptyState text="Добавьте первого персонажа и укажите его текущие остатки, чтобы начать учёт." />
         ) : (
           <div className="table-wrap">
             <table>
@@ -678,7 +708,8 @@ function CharactersScreen({
   onArchive,
   onDelete,
   onDeleteOperation,
-  onSaveOperation
+  onSaveOperation,
+  onCreateCharacter
 }: {
   characters: CharacterRecord[];
   selectedCharacter: CharacterRecord | null;
@@ -690,15 +721,16 @@ function CharactersScreen({
   onDelete: (character: CharacterRecord) => Promise<void>;
   onDeleteOperation: (character: CharacterRecord, period: PeriodRecord, operation: OperationRecord) => Promise<void>;
   onSaveOperation: (character: CharacterRecord, period: PeriodRecord, input: OperationFormInput, operationId?: string) => Promise<void>;
+  onCreateCharacter: (input: CharacterFormInput) => Promise<void>;
 }) {
   if (characters.length === 0) {
     return (
       <section className="card">
-        <EmptyState
-          text="Добавьте первого персонажа и укажите его текущие остатки, чтобы начать учёт."
-          action="Добавить персонажа"
-          onAction={() => setModal({ type: "character" })}
-        />
+        <div className="card-head">
+          <h2>Персонажи</h2>
+        </div>
+        <p className="subtitle">Добавьте первого персонажа и укажите его текущие остатки, чтобы начать учёт.</p>
+        <InlineCharacterForm onSubmit={onCreateCharacter} />
       </section>
     );
   }
@@ -1081,6 +1113,87 @@ function HistoryScreen({
   );
 }
 
+function InlineCharacterForm({
+  onCancel,
+  onSubmit
+}: {
+  onCancel?: () => void;
+  onSubmit: (input: CharacterFormInput) => Promise<void>;
+}) {
+  const [nickname, setNickname] = useState("");
+  const [server, setServer] = useState("");
+  const [adena, setAdena] = useState("");
+  const [lCoin, setLCoin] = useState("");
+  const [capturedAt, setCapturedAt] = useState(formatInputDateTime());
+  const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    setError("");
+
+    try {
+      if (!nickname.trim()) {
+        throw new Error("Ник обязателен.");
+      }
+
+      setSaving(true);
+      await onSubmit({
+        nickname,
+        server,
+        initialBalances: {
+          adena: parseNonNegativeAmount(adena, "Начальная адена"),
+          lCoin: parseNonNegativeAmount(lCoin, "Начальные L-монеты")
+        },
+        capturedAt: parseNotFuture(capturedAt)
+      });
+    } catch (caught) {
+      setError(translateFirebaseError(caught));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <form className="inline-operation-form" onSubmit={submit}>
+      <div className="inline-operation-row">
+        <div className="field compact-character-name">
+          <label htmlFor="quick-character-nickname">Ник</label>
+          <input id="quick-character-nickname" type="text" value={nickname} onChange={(event) => setNickname(event.target.value)} />
+        </div>
+        <div className="field compact-character-server">
+          <label htmlFor="quick-character-server">Сервер</label>
+          <input id="quick-character-server" type="text" value={server} onChange={(event) => setServer(event.target.value)} />
+        </div>
+        <div className="field compact-balance">
+          <label htmlFor="quick-character-adena">Адена</label>
+          <AmountInput id="quick-character-adena" value={adena} onChange={setAdena} />
+        </div>
+        <div className="field compact-balance">
+          <label htmlFor="quick-character-lcoin">L-монеты</label>
+          <AmountInput id="quick-character-lcoin" value={lCoin} onChange={setLCoin} />
+        </div>
+        <div className="field compact-date">
+          <label htmlFor="quick-character-captured-at">Дата остатка</label>
+          <input id="quick-character-captured-at" type="datetime-local" value={capturedAt} onChange={(event) => setCapturedAt(event.target.value)} />
+        </div>
+        <div className="inline-form-actions">
+          <button type="submit" disabled={saving}>
+            <Save size={15} />
+            {saving ? "Сохраняем..." : "Добавить"}
+          </button>
+          {onCancel ? (
+            <IconButton title="Скрыть форму" onClick={onCancel}>
+              <X size={16} />
+            </IconButton>
+          ) : null}
+        </div>
+      </div>
+      <div className="err">{error}</div>
+    </form>
+  );
+}
+
 function CharacterForm({
   character,
   onCancel,
@@ -1088,12 +1201,7 @@ function CharacterForm({
 }: {
   character?: CharacterRecord;
   onCancel: () => void;
-  onSubmit: (input: {
-    nickname: string;
-    server?: string;
-    initialBalances: { adena: number; lCoin: number };
-    capturedAt: Date;
-  }) => Promise<void>;
+  onSubmit: (input: CharacterFormInput) => Promise<void>;
 }) {
   const [nickname, setNickname] = useState(character?.nickname ?? "");
   const [server, setServer] = useState(character?.server ?? "");
