@@ -292,10 +292,6 @@ export async function saveOperation(
     throw new Error("Сумма операции должна быть целым числом больше нуля.");
   }
 
-  if (input.type === "special_income" && !input.comment?.trim()) {
-    throw new Error("Для крупного поступления нужно описание.");
-  }
-
   const operationRef = operationId
     ? doc(firestore, "users", uid, "characters", character.id, "periods", period.id, "operations", operationId)
     : doc(collection(firestore, "users", uid, "characters", character.id, "periods", period.id, "operations"));

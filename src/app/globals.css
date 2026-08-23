@@ -149,6 +149,11 @@ textarea {
   font-size: 13px;
 }
 
+input.amount-input {
+  min-width: 150px;
+  font-variant-numeric: tabular-nums;
+}
+
 textarea {
   min-height: 74px;
   resize: vertical;
@@ -191,8 +196,7 @@ h2 {
 .topbar-actions,
 .button-row,
 .form-actions,
-.actions-cell,
-.title-line {
+.actions-cell {
   display: flex;
   align-items: center;
   gap: 8px;

@@ -46,21 +46,35 @@ export function formatCompact(value: number): string {
 }
 
 export function formatDateTime(date: Date): string {
-  return new Intl.DateTimeFormat("ru-RU", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit"
-  }).format(date);
+  return formatDate(date);
 }
 
 export function formatDate(date: Date): string {
-  return new Intl.DateTimeFormat("ru-RU", {
-    day: "2-digit",
-    month: "short",
+  const parts = new Intl.DateTimeFormat("ru-RU", {
+    day: "numeric",
+    month: "long",
     year: "numeric"
-  }).format(date);
+  }).formatToParts(date);
+  const day = parts.find((part) => part.type === "day")?.value ?? "";
+  const month = parts.find((part) => part.type === "month")?.value ?? "";
+  const year = Number(parts.find((part) => part.type === "year")?.value);
+  const currentYear = new Date().getFullYear();
+
+  return year && year !== currentYear ? `${day} ${month}, ${year}` : `${day} ${month}`;
+}
+
+export function formatYmdDate(value: string): string {
+  const [year, month, day] = value.split("-").map(Number);
+
+  if (!year || !month || !day) {
+    return value;
+  }
+
+  return formatDate(new Date(year, month - 1, day));
+}
+
+export function formatYmdRange(start: string, end: string): string {
+  return `${formatYmdDate(start)} - ${formatYmdDate(end)}`;
 }
 
 export function formatInputDateTime(date = new Date()): string {
@@ -76,7 +90,7 @@ export function formatIntervalLabel(start: Date, end: Date): string {
   const sameDate = start.toDateString() === end.toDateString();
 
   if (sameDate) {
-    return `${formatDate(start)}, ${timeOnly(start)}-${timeOnly(end)}`;
+    return formatDate(start);
   }
 
   return `${formatDate(start)} - ${formatDate(end)}`;
@@ -104,11 +118,4 @@ export function summarizeCurrency(summary: CurrencySummary): string {
 
 function formatCompactNumber(value: number): string {
   return Number.isInteger(value) ? String(value) : value.toFixed(value >= 10 ? 1 : 2).replace(".", ",");
-}
-
-function timeOnly(date: Date): string {
-  return new Intl.DateTimeFormat("ru-RU", {
-    hour: "2-digit",
-    minute: "2-digit"
-  }).format(date);
 }

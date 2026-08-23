@@ -60,6 +60,7 @@ import {
   formatInteger,
   formatIntervalLabel,
   formatSignedInteger,
+  formatYmdRange,
   operationCurrencyLabels,
   parseInputDateTime,
   resultClassName,
@@ -782,12 +783,7 @@ function CharacterDetail({
       <section className="card">
         <div className="card-head character-head">
           <div>
-            <div className="title-line">
-              <h2>{character.nickname}</h2>
-              <span className={character.status === "active" ? "pill green" : "pill amber"}>
-                {character.status === "active" ? "Активен" : "Архив"}
-              </span>
-            </div>
+            <h2>{character.nickname}</h2>
             <p className="subtitle">
               {character.server ? `${character.server} · ` : ""}последний замер {formatDateTime(character.lastSnapshotAt)}
             </p>
@@ -860,7 +856,7 @@ function CharacterDetail({
       <section className="card">
         <div className="card-head">
           <h2>Операции периода</h2>
-          <span className="small">{period ? `${period.plannedStartDate} - ${period.plannedEndDate}` : "Нет периода"}</span>
+          <span className="small">{period ? formatYmdRange(period.plannedStartDate, period.plannedEndDate) : "Нет периода"}</span>
         </div>
         <div className="row">
           <div className="field">
@@ -891,7 +887,7 @@ function CharacterDetail({
             <table>
               <thead>
                 <tr>
-                  <th>Дата и время</th>
+                  <th>Дата</th>
                   <th>Тип</th>
                   <th>Валюта</th>
                   <th>Категория</th>
@@ -945,11 +941,13 @@ function HistoryScreen({
 }) {
   const [characterFilter, setCharacterFilter] = useState("all");
   const filteredCharacters = characterFilter === "all" ? characters : characters.filter((character) => character.id === characterFilter);
-  const periods = filteredCharacters.flatMap((character) =>
-    character.periods
-      .filter((period) => period.status === "closed")
-      .map((period) => ({ character, period, summary: period.summary ?? calculatePeriodSummary(period.snapshots, period.operations) }))
-  );
+  const periods = filteredCharacters
+    .flatMap((character) =>
+      character.periods
+        .filter((period) => period.status === "closed")
+        .map((period) => ({ character, period, summary: period.summary ?? calculatePeriodSummary(period.snapshots, period.operations) }))
+    )
+    .sort((left, right) => getPeriodSortTime(right.period) - getPeriodSortTime(left.period));
 
   return (
     <section className="card">
@@ -1002,7 +1000,7 @@ function HistoryScreen({
                   <tr key={`${character.id}-${period.id}`}>
                     <td>{character.nickname}</td>
                     <td>
-                      {period.plannedStartDate} - {period.plannedEndDate}
+                      {formatYmdRange(period.plannedStartDate, period.plannedEndDate)}
                       {period.closedAt ? <div className="small">Закрыт {formatDateTime(period.closedAt)}</div> : null}
                     </td>
                     <td className="num-cell">{summary.accountedDays}</td>
@@ -1048,8 +1046,8 @@ function CharacterForm({
 }) {
   const [nickname, setNickname] = useState(character?.nickname ?? "");
   const [server, setServer] = useState(character?.server ?? "");
-  const [adena, setAdena] = useState("0");
-  const [lCoin, setLCoin] = useState("0");
+  const [adena, setAdena] = useState("");
+  const [lCoin, setLCoin] = useState("");
   const [capturedAt, setCapturedAt] = useState(formatInputDateTime());
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
@@ -1098,11 +1096,11 @@ function CharacterForm({
           <div className="row">
             <div className="field">
               <label htmlFor="character-adena">Начальная адена</label>
-              <input id="character-adena" inputMode="numeric" type="number" min="0" step="1" value={adena} onChange={(event) => setAdena(event.target.value)} />
+              <AmountInput id="character-adena" value={adena} onChange={setAdena} />
             </div>
             <div className="field">
               <label htmlFor="character-lcoin">Начальные L-монеты</label>
-              <input id="character-lcoin" inputMode="numeric" type="number" min="0" step="1" value={lCoin} onChange={(event) => setLCoin(event.target.value)} />
+              <AmountInput id="character-lcoin" value={lCoin} onChange={setLCoin} />
             </div>
             <div className="field">
               <label htmlFor="character-captured-at">Дата и время замера</label>
@@ -1129,8 +1127,8 @@ function SnapshotForm({
   onSubmit: (period: PeriodRecord, input: { balances: { adena: number; lCoin: number }; capturedAt: Date; comment?: string }) => Promise<void>;
 }) {
   const lastSnapshot = period ? getLastSnapshot(period.snapshots) : null;
-  const [adena, setAdena] = useState(String(character.currentBalances.adena));
-  const [lCoin, setLCoin] = useState(String(character.currentBalances.lCoin));
+  const [adena, setAdena] = useState(amountToInputValue(character.currentBalances.adena));
+  const [lCoin, setLCoin] = useState(amountToInputValue(character.currentBalances.lCoin));
   const [capturedAt, setCapturedAt] = useState(formatInputDateTime());
   const [comment, setComment] = useState("");
   const [error, setError] = useState("");
@@ -1202,11 +1200,11 @@ function SnapshotForm({
       <div className="row">
         <div className="field">
           <label htmlFor="snapshot-adena">Текущая адена</label>
-          <input id="snapshot-adena" type="number" min="0" step="1" value={adena} onChange={(event) => setAdena(event.target.value)} />
+          <AmountInput id="snapshot-adena" value={adena} onChange={setAdena} />
         </div>
         <div className="field">
           <label htmlFor="snapshot-lcoin">Текущие L-монеты</label>
-          <input id="snapshot-lcoin" type="number" min="0" step="1" value={lCoin} onChange={(event) => setLCoin(event.target.value)} />
+          <AmountInput id="snapshot-lcoin" value={lCoin} onChange={setLCoin} />
         </div>
         <div className="field">
           <label htmlFor="snapshot-date">Дата и время</label>
@@ -1273,10 +1271,6 @@ function OperationForm({
         throw new Error("Нет открытого периода.");
       }
 
-      if ((type === "special_income" || category === "другое") && !comment.trim()) {
-        throw new Error(type === "special_income" ? "Для крупного поступления нужно описание." : "Для категории «Другое» нужен комментарий.");
-      }
-
       const input = {
         type,
         currency,
@@ -1311,7 +1305,7 @@ function OperationForm({
         </div>
         <div className="field">
           <label htmlFor="operation-amount">Сумма</label>
-          <input id="operation-amount" type="number" min="1" step="1" value={amount} onChange={(event) => setAmount(event.target.value)} />
+          <AmountInput id="operation-amount" value={amount} onChange={setAmount} />
         </div>
         <div className="field">
           <label htmlFor="operation-category">Категория</label>
@@ -1329,7 +1323,7 @@ function OperationForm({
         </div>
       </div>
       <div className="field">
-        <label htmlFor="operation-comment">{type === "special_income" || category === "другое" ? "Описание" : "Комментарий"}</label>
+        <label htmlFor="operation-comment">Комментарий</label>
         <textarea id="operation-comment" value={comment} onChange={(event) => setComment(event.target.value)} />
       </div>
       {type === "special_income" ? (
@@ -1359,8 +1353,8 @@ function ClosePeriodForm({
   onCancel: () => void;
   onSubmit: (period: PeriodRecord, input: { balances: { adena: number; lCoin: number }; capturedAt: Date; comment?: string }) => Promise<void>;
 }) {
-  const [adena, setAdena] = useState(String(character.currentBalances.adena));
-  const [lCoin, setLCoin] = useState(String(character.currentBalances.lCoin));
+  const [adena, setAdena] = useState(amountToInputValue(character.currentBalances.adena));
+  const [lCoin, setLCoin] = useState(amountToInputValue(character.currentBalances.lCoin));
   const [capturedAt, setCapturedAt] = useState(formatInputDateTime());
   const [comment, setComment] = useState("Закрытие периода");
   const [error, setError] = useState("");
@@ -1428,11 +1422,11 @@ function ClosePeriodForm({
       <div className="row">
         <div className="field">
           <label htmlFor="close-adena">Остаток адены</label>
-          <input id="close-adena" type="number" min="0" step="1" value={adena} onChange={(event) => setAdena(event.target.value)} />
+          <AmountInput id="close-adena" value={adena} onChange={setAdena} />
         </div>
         <div className="field">
           <label htmlFor="close-lcoin">Остаток L-монет</label>
-          <input id="close-lcoin" type="number" min="0" step="1" value={lCoin} onChange={(event) => setLCoin(event.target.value)} />
+          <AmountInput id="close-lcoin" value={lCoin} onChange={setLCoin} />
         </div>
         <div className="field">
           <label htmlFor="close-date">Дата и время</label>
@@ -1501,7 +1495,7 @@ function PeriodDetail({
 
   return (
     <div>
-      <ModalHead title={`${character.nickname} · период ${period.plannedStartDate} - ${period.plannedEndDate}`} onCancel={onClose} />
+      <ModalHead title={`${character.nickname} · период ${formatYmdRange(period.plannedStartDate, period.plannedEndDate)}`} onCancel={onClose} />
       <SummaryStats balances={{ adena: summary.adena.closingBalance, lCoin: summary.lCoin.closingBalance }} summary={summary} selectedCurrency={selectedCurrency} includeAverage />
       <p className="subtitle">{summarizeCurrency(summary[selectedCurrency])}</p>
       <IntervalsTable intervals={intervals} selectedCurrency={selectedCurrency} />
@@ -1717,6 +1711,21 @@ function FormActions({ onCancel, saving, submitLabel }: { onCancel: () => void; 
   );
 }
 
+function AmountInput({ id, value, onChange }: { id: string; value: string; onChange: (value: string) => void }) {
+  return (
+    <input
+      id={id}
+      className="amount-input"
+      inputMode="numeric"
+      type="text"
+      autoComplete="off"
+      placeholder="0"
+      value={formatAmountInput(value)}
+      onChange={(event) => onChange(normalizeAmountInput(event.target.value))}
+    />
+  );
+}
+
 function IconButton({ title, children, onClick }: { title: string; children: ReactNode; onClick: () => void }) {
   return (
     <button className="icon-btn" type="button" title={title} aria-label={title} onClick={onClick}>
@@ -1782,7 +1791,8 @@ function calculateDashboardTotals(characters: CharacterRecord[]): { balances: Re
 }
 
 function parseNonNegativeAmount(value: string, label: string): number {
-  const parsed = Number(value);
+  const normalized = normalizeAmountInput(value);
+  const parsed = normalized === "" ? 0 : Number(normalized);
 
   if (!Number.isSafeInteger(parsed) || parsed < 0) {
     throw new Error(`${label}: нужно неотрицательное целое число.`);
@@ -1792,13 +1802,32 @@ function parseNonNegativeAmount(value: string, label: string): number {
 }
 
 function parsePositiveAmount(value: string, label: string): number {
-  const parsed = Number(value);
+  const normalized = normalizeAmountInput(value);
+  const parsed = normalized === "" ? Number.NaN : Number(normalized);
 
   if (!Number.isSafeInteger(parsed) || parsed <= 0) {
     throw new Error(`${label}: нужно целое число больше нуля.`);
   }
 
   return parsed;
+}
+
+function amountToInputValue(value: number): string {
+  return value > 0 ? String(value) : "";
+}
+
+function normalizeAmountInput(value: string): string {
+  const digitsOnly = value.replace(/\D/g, "");
+  return digitsOnly.replace(/^0+(?=\d)/, "");
+}
+
+function formatAmountInput(value: string): string {
+  const normalized = normalizeAmountInput(value);
+  return normalized.replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+}
+
+function getPeriodSortTime(period: PeriodRecord): number {
+  return (period.closedAt ?? period.openedAt).getTime();
 }
 
 function parseNotFuture(value: string): Date {

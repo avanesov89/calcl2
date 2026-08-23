@@ -92,14 +92,7 @@ service cloud.firestore {
               && isCurrency(request.resource.data.currency)
               && isPositiveInteger(request.resource.data.amount)
               && request.resource.data.category is string
-              && request.resource.data.occurredAt is timestamp
-              && (
-                request.resource.data.type != 'special_income'
-                || (
-                  request.resource.data.comment is string
-                  && request.resource.data.comment.size() > 0
-                )
-              );
+              && request.resource.data.occurredAt is timestamp;
           }
         }
       }
