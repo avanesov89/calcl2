@@ -177,7 +177,7 @@ export async function createCharacter(uid: string, input: CharacterInput): Promi
     kind: "initial",
     balances,
     capturedAt: Timestamp.fromDate(input.capturedAt),
-    comment: "Начальный замер",
+    comment: "Начальный остаток",
     createdAt: now,
     updatedAt: now
   });
@@ -253,7 +253,7 @@ export async function saveSnapshot(
   const targetSnapshot = snapshotId ? orderedSnapshots.find((snapshot) => snapshot.id === snapshotId) : null;
 
   if (snapshotId && !targetSnapshot) {
-    throw new Error("Замер не найден.");
+    throw new Error("Остаток не найден.");
   }
 
   if (targetSnapshot) {
@@ -262,17 +262,17 @@ export async function saveSnapshot(
     const nextSnapshot = orderedSnapshots[targetIndex + 1] ?? null;
 
     if (previousSnapshot && input.capturedAt.getTime() < previousSnapshot.capturedAt.getTime()) {
-      throw new Error("Дата замера не может быть раньше предыдущего замера.");
+      throw new Error("Дата остатка не может быть раньше предыдущего остатка.");
     }
 
     if (nextSnapshot && input.capturedAt.getTime() > nextSnapshot.capturedAt.getTime()) {
-      throw new Error("Дата замера не может быть позже следующего замера.");
+      throw new Error("Дата остатка не может быть позже следующего остатка.");
     }
   } else {
     const lastSnapshot = getLastSnapshot(period.snapshots);
 
     if (lastSnapshot && input.capturedAt.getTime() < lastSnapshot.capturedAt.getTime()) {
-      throw new Error("Новый замер не может быть раньше предыдущего без режима исправления истории.");
+      throw new Error("Новый остаток не может быть раньше предыдущего без режима исправления истории.");
     }
   }
 
@@ -428,7 +428,7 @@ export async function closePeriod(
     kind: "closing",
     balances,
     capturedAt: Timestamp.fromDate(input.capturedAt),
-    comment: input.comment?.trim() || "Закрытие периода",
+    comment: input.comment?.trim() || "Завершение недели",
     createdAt: now,
     updatedAt: now
   });
@@ -452,7 +452,7 @@ export async function closePeriod(
     kind: "initial",
     balances,
     capturedAt: Timestamp.fromDate(nextPeriodStart),
-    comment: "Остаток перенесен из закрытого периода",
+    comment: "Остаток перенесен из завершенной недели",
     createdAt: now,
     updatedAt: now
   });
@@ -476,17 +476,17 @@ export async function reopenLastClosedPeriod(
   const latestClosed = closedPeriods[closedPeriods.length - 1];
 
   if (!latestClosed || latestClosed.id !== period.id) {
-    throw new Error("В MVP можно открыть для исправления только последний закрытый период.");
+    throw new Error("Можно открыть для исправления только последнюю завершённую неделю.");
   }
 
   const activePeriod = character.periods.find((item) => item.id === character.activePeriodId);
 
   if (!activePeriod) {
-    throw new Error("Не найден текущий открытый период.");
+    throw new Error("Не найдена текущая неделя.");
   }
 
   if (activePeriod.operations.length > 0 || activePeriod.snapshots.length > 1) {
-    throw new Error("Следующий период уже содержит записи. Безопасный каскадный пересчет в MVP ограничен.");
+    throw new Error("Следующая неделя уже содержит записи. Безопасный каскадный пересчёт пока ограничен.");
   }
 
   await runTransaction(firestore, async (transaction) => {

@@ -271,7 +271,7 @@ export default function AppShell() {
             await reloadWithNotice(character.status === "archived" ? "Персонаж возвращён в активные." : "Персонаж архивирован.");
           }}
           onDelete={async (character) => {
-            if (!window.confirm(`Удалить ${character.nickname} вместе со всеми периодами, замерами и операциями?`)) {
+            if (!window.confirm(`Удалить ${character.nickname} вместе со всеми неделями, остатками и операциями?`)) {
               return;
             }
 
@@ -336,7 +336,7 @@ export default function AppShell() {
               onCancel={() => setModal(null)}
               onSubmit={async (period, input, snapshotId) => {
                 await saveSnapshot(currentUser.uid, modal.character, period, input, snapshotId);
-                await reloadWithNotice(snapshotId ? "Замер обновлён." : "Остаток сохранён.");
+                await reloadWithNotice(snapshotId ? "Остаток обновлён." : "Остаток сохранён.");
                 setModal(null);
               }}
             />
@@ -365,7 +365,7 @@ export default function AppShell() {
               onCancel={() => setModal(null)}
               onSubmit={async (period, input) => {
                 await closePeriod(currentUser.uid, modal.character, period, input);
-                await reloadWithNotice("Период закрыт, следующий открыт автоматически.");
+                await reloadWithNotice("Неделя завершена, следующая начата автоматически.");
                 setModal(null);
               }}
             />
@@ -379,7 +379,7 @@ export default function AppShell() {
               onClose={() => setModal(null)}
               onReopen={async () => {
                 await reopenLastClosedPeriod(currentUser.uid, modal.character, modal.period);
-                await reloadWithNotice("Период открыт для исправления.");
+                await reloadWithNotice("Неделя открыта для исправления.");
                 setModal(null);
               }}
             />
@@ -581,7 +581,7 @@ function Overview({
         <div className="card-head">
           <div>
             <h2>Общий обзор</h2>
-            <p className="subtitle">Активные персонажи, текущие открытые периоды.</p>
+            <p className="subtitle">Активные персонажи и текущая неделя.</p>
           </div>
           <button type="button" onClick={() => setModal({ type: "character" })}>
             <Plus size={15} />
@@ -627,7 +627,7 @@ function Overview({
                     Крупные поступления
                   </SortableTh>
                   <SortableTh active={sortKey === "lastSnapshotAt"} direction={sortDirection} onClick={() => toggleSort("lastSnapshotAt")}>
-                    Последний замер
+                    Последний остаток
                   </SortableTh>
                 </tr>
               </thead>
@@ -654,7 +654,7 @@ function Overview({
                       <td className="num-cell">{summary ? formatInteger(summary[selectedCurrency].specialIncome) : "—"}</td>
                       <td>
                         <span className={hasUncounted ? "pill amber" : "date-cell"}>{formatDateTime(character.lastSnapshotAt)}</span>
-                        {hasUncounted ? <div className="small">Есть неучтённые операции</div> : null}
+                        {hasUncounted ? <div className="small">Есть операции после остатка</div> : null}
                       </td>
                     </tr>
                   );
@@ -753,6 +753,7 @@ function CharacterDetail({
   const intervals = period ? [...buildIntervals(period.snapshots, period.operations, "preliminary", timezone)].reverse() : [];
   const hasUncounted = period ? hasOperationsAfterLastSnapshot(period.snapshots, period.operations) : false;
   const lastSnapshot = period ? getLastSnapshot(period.snapshots) : null;
+  const pendingOperationsNote = period ? formatPendingOperationsNote(period, selectedCurrency) : "";
   const operations = period
     ? sortOperations(period.operations).filter((operation) => {
         const typeOk = operationTypeFilter === "all" || operation.type === operationTypeFilter;
@@ -768,7 +769,7 @@ function CharacterDetail({
           <div>
             <h2>{character.nickname}</h2>
             <p className="subtitle">
-              {character.server ? `${character.server} · ` : ""}последний замер {formatDateTime(character.lastSnapshotAt)}
+              {character.server ? `${character.server} · ` : ""}последний остаток {formatDateTime(character.lastSnapshotAt)}
             </p>
           </div>
           <div className="menu-wrap">
@@ -802,6 +803,19 @@ function CharacterDetail({
                   {character.status === "archived" ? "Вернуть из архива" : "Архивировать"}
                 </button>
                 <button
+                  className="menu-item"
+                  type="button"
+                  role="menuitem"
+                  disabled={!period}
+                  onClick={() => {
+                    setIsCharacterMenuOpen(false);
+                    setModal({ type: "close", character });
+                  }}
+                >
+                  <Save size={15} />
+                  Завершить неделю
+                </button>
+                <button
                   className="menu-item danger"
                   type="button"
                   role="menuitem"
@@ -822,12 +836,12 @@ function CharacterDetail({
         {summary ? (
           <SummaryStats balances={character.currentBalances} summary={summary} selectedCurrency={selectedCurrency} includeAverage />
         ) : (
-          <p className="subtitle">Нет открытого периода.</p>
+          <p className="subtitle">Нет текущей недели.</p>
         )}
 
         {hasUncounted ? (
           <div className="steps warn">
-            После последнего замера есть новые операции. Обновите остаток, чтобы получить актуальный результат.
+            {pendingOperationsNote || "После последнего остатка есть операции. Введите текущий остаток, чтобы обновить расчёт."}
           </div>
         ) : null}
       </section>
@@ -835,22 +849,18 @@ function CharacterDetail({
       <section className="card">
         <div className="card-head">
           <div>
-            <h2>Суточные результаты</h2>
-            {lastSnapshot ? <span className="small">Последний замер: {formatDateTime(lastSnapshot.capturedAt)}</span> : null}
+            <h2>Расчёт по остаткам</h2>
+            {lastSnapshot ? <span className="small">Последний введённый остаток: {formatDateTime(lastSnapshot.capturedAt)}</span> : null}
           </div>
           <div className="button-row section-actions">
             <button type="button" onClick={() => setModal({ type: "snapshot", character })} disabled={!period}>
               <RefreshCw size={15} />
-              Обновить остаток
-            </button>
-            <button className="secondary" type="button" onClick={() => setModal({ type: "close", character })} disabled={!period}>
-              <Save size={15} />
-              Закрыть период
+              Ввести текущий остаток
             </button>
           </div>
         </div>
         {!period || intervals.length === 0 ? (
-          <EmptyState text="Сегодняшний результат появится после фиксации текущего остатка." />
+          <EmptyState text="Результат появится после ввода следующего текущего остатка." />
         ) : (
           <IntervalsTable
             intervals={intervals}
@@ -862,8 +872,8 @@ function CharacterDetail({
 
       <section className="card">
         <div className="card-head">
-          <h2>Операции периода</h2>
-          <span className="small">{period ? formatYmdRange(period.plannedStartDate, period.plannedEndDate) : "Нет периода"}</span>
+          <h2>Операции текущей недели</h2>
+          <span className="small">{period ? formatYmdRange(period.plannedStartDate, period.plannedEndDate) : "Нет текущей недели"}</span>
         </div>
         <div className="table-toolbar">
           <div className="row filter-row">
@@ -922,7 +932,7 @@ function CharacterDetail({
           />
         ) : null}
         {!period || operations.length === 0 ? (
-          <p className="subtitle">В этом периоде пока нет расходов и крупных поступлений.</p>
+          <p className="subtitle">В текущей неделе пока нет расходов и крупных поступлений.</p>
         ) : (
           <div className="table-wrap">
             <table>
@@ -994,8 +1004,8 @@ function HistoryScreen({
     <section className="card">
       <div className="card-head">
         <div>
-          <h2>История периодов</h2>
-          <p className="subtitle">Закрытые недели с детализацией по персонажам.</p>
+          <h2>История недель</h2>
+          <p className="subtitle">Завершённые недели с детализацией по персонажам.</p>
         </div>
       </div>
       <div className="row">
@@ -1042,7 +1052,7 @@ function HistoryScreen({
                     <td>{character.nickname}</td>
                     <td>
                       {formatYmdRange(period.plannedStartDate, period.plannedEndDate)}
-                      {period.closedAt ? <div className="small">Закрыт {formatDateTime(period.closedAt)}</div> : null}
+                      {period.closedAt ? <div className="small">Завершена {formatDateTime(period.closedAt)}</div> : null}
                     </td>
                     <td className="num-cell">{summary.accountedDays}</td>
                     <td className="num-cell">{formatInteger(currencySummary.openingBalance)}</td>
@@ -1144,7 +1154,7 @@ function CharacterForm({
               <AmountInput id="character-lcoin" value={lCoin} onChange={setLCoin} />
             </div>
             <div className="field">
-              <label htmlFor="character-captured-at">Дата и время замера</label>
+              <label htmlFor="character-captured-at">Дата и время остатка</label>
               <input id="character-captured-at" type="datetime-local" value={capturedAt} onChange={(event) => setCapturedAt(event.target.value)} />
             </div>
           </div>
@@ -1215,7 +1225,7 @@ function SnapshotForm({
 
     try {
       if (!period) {
-        throw new Error("Нет открытого периода.");
+        throw new Error("Нет текущей недели.");
       }
 
       const input = {
@@ -1228,15 +1238,15 @@ function SnapshotForm({
       };
 
       if (snapshot && previousSnapshot && input.capturedAt.getTime() < previousSnapshot.capturedAt.getTime()) {
-        throw new Error("Дата замера не может быть раньше предыдущего.");
+        throw new Error("Дата остатка не может быть раньше предыдущего.");
       }
 
       if (snapshot && nextSnapshot && input.capturedAt.getTime() > nextSnapshot.capturedAt.getTime()) {
-        throw new Error("Дата замера не может быть позже следующего.");
+        throw new Error("Дата остатка не может быть позже следующего.");
       }
 
       if (!snapshot && lastSnapshot && input.capturedAt.getTime() < lastSnapshot.capturedAt.getTime()) {
-        throw new Error("Новый замер не может быть раньше предыдущего.");
+        throw new Error("Новый остаток не может быть раньше предыдущего.");
       }
 
       setSaving(true);
@@ -1250,16 +1260,16 @@ function SnapshotForm({
 
   return (
     <form onSubmit={submit}>
-      <ModalHead title={`${snapshot ? "Редактировать замер" : "Обновить остаток"} · ${character.nickname}`} onCancel={onCancel} />
+      <ModalHead title={`${snapshot ? "Редактировать остаток" : "Ввести текущий остаток"} · ${character.nickname}`} onCancel={onCancel} />
       {comparisonSnapshot ? (
         <div className="steps">
-          Предыдущий замер: <b>{formatDateTime(comparisonSnapshot.capturedAt)}</b>, адена <b>{formatInteger(comparisonSnapshot.balances.adena)}</b>, L-монеты{" "}
+          Предыдущий остаток: <b>{formatDateTime(comparisonSnapshot.capturedAt)}</b>, адена <b>{formatInteger(comparisonSnapshot.balances.adena)}</b>, L-монеты{" "}
           <b>{formatInteger(comparisonSnapshot.balances.lCoin)}</b>.
         </div>
       ) : null}
       {snapshot && nextSnapshot ? (
         <div className="steps">
-          Следующий замер: <b>{formatDateTime(nextSnapshot.capturedAt)}</b>. Дату исправляемого замера нужно оставить раньше него.
+          Следующий остаток: <b>{formatDateTime(nextSnapshot.capturedAt)}</b>. Дату исправляемого остатка нужно оставить раньше него.
         </div>
       ) : null}
       <div className="row">
@@ -1288,7 +1298,7 @@ function SnapshotForm({
         </div>
       ) : null}
       <div className="err">{error}</div>
-      <FormActions onCancel={onCancel} saving={saving} submitLabel={snapshot ? "Сохранить" : "Сохранить замер"} />
+      <FormActions onCancel={onCancel} saving={saving} submitLabel="Сохранить остаток" />
     </form>
   );
 }
@@ -1322,7 +1332,7 @@ function InlineOperationForm({
 
     try {
       if (!period) {
-        throw new Error("Нет открытого периода.");
+        throw new Error("Нет текущей недели.");
       }
 
       const input = {
@@ -1386,10 +1396,10 @@ function InlineOperationForm({
         </div>
       </div>
       {type === "special_income" ? (
-        <div className="steps">Поступление уже должно входить в фактический остаток. Эта запись только выделит его из обычного фарма.</div>
+        <div className="steps">Поступление не меняет остаток само. Оно только отделяет крупный дроп/продажу от обычного фарма.</div>
       ) : null}
       {isAfterLastSnapshot ? (
-        <div className="steps warn">Операция позже последнего замера. Она попадёт в расчёт после обновления остатка.</div>
+        <div className="steps warn">Операция позже последнего остатка. Введите текущий остаток, чтобы она попала в расчёт.</div>
       ) : null}
       <div className="err">{error}</div>
     </form>
@@ -1429,7 +1439,7 @@ function OperationForm({
 
     try {
       if (!period) {
-        throw new Error("Нет открытого периода.");
+        throw new Error("Нет текущей недели.");
       }
 
       const input = {
@@ -1489,11 +1499,11 @@ function OperationForm({
       </div>
       {type === "special_income" ? (
         <div className="steps">
-          Поступление уже должно входить в фактический остаток. Эта запись только выделит его из обычного фарма.
+          Поступление не меняет остаток само. Оно только отделяет крупный дроп/продажу от обычного фарма.
         </div>
       ) : null}
       {isAfterLastSnapshot ? (
-        <div className="steps warn">Операция позже последнего замера. Она попадёт в расчёт после обновления остатка.</div>
+        <div className="steps warn">Операция позже последнего остатка. Введите текущий остаток, чтобы она попала в расчёт.</div>
       ) : null}
       <div className="err">{error}</div>
       <FormActions onCancel={onCancel} saving={saving} submitLabel={operation ? "Сохранить" : "Добавить"} />
@@ -1517,7 +1527,7 @@ function ClosePeriodForm({
   const [adena, setAdena] = useState(amountToInputValue(character.currentBalances.adena));
   const [lCoin, setLCoin] = useState(amountToInputValue(character.currentBalances.lCoin));
   const [capturedAt, setCapturedAt] = useState(formatInputDateTime());
-  const [comment, setComment] = useState("Закрытие периода");
+  const [comment, setComment] = useState("Завершение недели");
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const lastSnapshot = period ? getLastSnapshot(period.snapshots) : null;
@@ -1552,7 +1562,7 @@ function ClosePeriodForm({
 
     try {
       if (!period) {
-        throw new Error("Нет открытого периода.");
+        throw new Error("Нет текущей недели.");
       }
 
       const input = {
@@ -1565,7 +1575,7 @@ function ClosePeriodForm({
       };
 
       if (lastSnapshot && input.capturedAt.getTime() < lastSnapshot.capturedAt.getTime()) {
-        throw new Error("Закрывающий замер не может быть раньше последнего замера.");
+        throw new Error("Итоговый остаток не может быть раньше последнего остатка.");
       }
 
       setSaving(true);
@@ -1579,7 +1589,7 @@ function ClosePeriodForm({
 
   return (
     <form onSubmit={submit}>
-      <ModalHead title={`Закрыть период · ${character.nickname}`} onCancel={onCancel} />
+      <ModalHead title={`Завершить неделю · ${character.nickname}`} onCancel={onCancel} />
       <div className="row">
         <div className="field">
           <label htmlFor="close-adena">Остаток адены</label>
@@ -1608,13 +1618,13 @@ function ClosePeriodForm({
           </p>
           {durationWarning ? (
             <div className="steps warn">
-              Период длился {preview.accountedDays} дн. Сравнивать его с обычной неделей следует с осторожностью.
+              Неделя длится {preview.accountedDays} дн. Сравнивать её с обычной неделей следует с осторожностью.
             </div>
           ) : null}
         </div>
       ) : null}
       <div className="err">{error}</div>
-      <FormActions onCancel={onCancel} saving={saving} submitLabel="Закрыть период" />
+      <FormActions onCancel={onCancel} saving={saving} submitLabel="Завершить неделю" />
     </form>
   );
 }
@@ -1638,7 +1648,7 @@ function PeriodDetail({
   const intervals = [...buildIntervals(period.snapshots, period.operations, "closed")].reverse();
 
   async function reopen() {
-    if (!window.confirm("Открыть последний закрытый период для исправления? Следующий пустой период будет удалён.")) {
+    if (!window.confirm("Открыть последнюю завершённую неделю для исправления? Следующая пустая неделя будет удалена.")) {
       return;
     }
 
@@ -1656,7 +1666,7 @@ function PeriodDetail({
 
   return (
     <div>
-      <ModalHead title={`${character.nickname} · период ${formatYmdRange(period.plannedStartDate, period.plannedEndDate)}`} onCancel={onClose} />
+      <ModalHead title={`${character.nickname} · неделя ${formatYmdRange(period.plannedStartDate, period.plannedEndDate)}`} onCancel={onClose} />
       <SummaryStats balances={{ adena: summary.adena.closingBalance, lCoin: summary.lCoin.closingBalance }} summary={summary} selectedCurrency={selectedCurrency} includeAverage />
       <p className="subtitle">{summarizeCurrency(summary[selectedCurrency])}</p>
       <IntervalsTable intervals={intervals} selectedCurrency={selectedCurrency} />
@@ -1666,7 +1676,7 @@ function PeriodDetail({
         </button>
         <button className="secondary" type="button" onClick={reopen} disabled={saving}>
           <Undo2 size={15} />
-          Открыть для исправления
+          Открыть неделю для исправления
         </button>
       </div>
       <div className="err">{error}</div>
@@ -1725,7 +1735,7 @@ function IntervalsTable({
       <table>
         <thead>
           <tr>
-            <th>День/интервал</th>
+            <th>Промежуток</th>
             <th className="right">Было</th>
             <th className="right">Расходы</th>
             <th className="right">Крупные поступления</th>
@@ -1746,7 +1756,7 @@ function IntervalsTable({
                 <td>
                   <span className="date-cell">{formatIntervalLabel(interval.startSnapshot.capturedAt, interval.endSnapshot.capturedAt)}</span>
                   {interval.missingDays > 0 ? (
-                    <div className="small">Нет отдельного замера за {interval.missingDays} дн.; интервал объединён.</div>
+                    <div className="small">Нет отдельного остатка за {interval.missingDays} дн.; промежуток объединён.</div>
                   ) : null}
                 </td>
                 <td className="num-cell">{formatInteger(summary.openingBalance)}</td>
@@ -1758,12 +1768,12 @@ function IntervalsTable({
                 <td className={`num-cell ${resultClassName(summary.netResult)}`}>{formatSignedInteger(summary.netResult)}</td>
                 <td>
                   <span className={interval.status === "closed" ? "pill green" : "pill amber"}>
-                    {interval.status === "closed" ? "Закрыто" : "Предварительно"}
+                    {interval.status === "closed" ? "Завершено" : "Текущая"}
                   </span>
                 </td>
                 {onEditSnapshot ? (
                   <td className="actions-cell">
-                    <IconButton title="Редактировать замер" onClick={() => onEditSnapshot(interval.endSnapshot)}>
+                    <IconButton title="Редактировать остаток" onClick={() => onEditSnapshot(interval.endSnapshot)}>
                       <Pencil size={15} />
                     </IconButton>
                   </td>
@@ -1977,6 +1987,39 @@ function calculateDashboardTotals(characters: CharacterRecord[]): { balances: Re
   }
 
   return totals;
+}
+
+function formatPendingOperationsNote(period: PeriodRecord, selectedCurrency: Currency): string {
+  const lastSnapshot = getLastSnapshot(period.snapshots);
+  const lastSnapshotTime = lastSnapshot?.capturedAt.getTime() ?? Number.NEGATIVE_INFINITY;
+  const operationCurrency = selectedCurrency === "lCoin" ? "l_coin" : "adena";
+  const operationsAfterLastBalance = period.operations.filter((operation) => operation.occurredAt.getTime() > lastSnapshotTime);
+  const selectedCurrencyOperations = operationsAfterLastBalance.filter((operation) => operation.currency === operationCurrency);
+  const expenses = selectedCurrencyOperations
+    .filter((operation) => operation.type === "expense")
+    .reduce((sum, operation) => sum + operation.amount, 0);
+  const income = selectedCurrencyOperations
+    .filter((operation) => operation.type === "special_income")
+    .reduce((sum, operation) => sum + operation.amount, 0);
+  const parts = [];
+
+  if (expenses > 0) {
+    parts.push(`расходы ${formatInteger(expenses)}`);
+  }
+
+  if (income > 0) {
+    parts.push(`поступления ${formatInteger(income)}`);
+  }
+
+  if (parts.length === 0 && operationsAfterLastBalance.length > 0) {
+    return "После последнего остатка есть операции в другой валюте. Переключите валюту или введите текущий остаток, чтобы обновить расчёт.";
+  }
+
+  if (parts.length === 0) {
+    return "";
+  }
+
+  return `После последнего остатка: ${parts.join(", ")}. Введите текущий остаток, чтобы обновить расчёт.`;
 }
 
 function parseNonNegativeAmount(value: string, label: string): number {
