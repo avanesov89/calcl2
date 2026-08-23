@@ -1,0 +1,112 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isOwner(uid) {
+      return request.auth != null && request.auth.uid == uid;
+    }
+
+    function isTheme(theme) {
+      return theme in ['light', 'dark', 'system'];
+    }
+
+    function isStatus(status) {
+      return status in ['active', 'archived'];
+    }
+
+    function isPeriodStatus(status) {
+      return status in ['open', 'closed'];
+    }
+
+    function isSnapshotKind(kind) {
+      return kind in ['initial', 'daily', 'closing'];
+    }
+
+    function isOperationType(type) {
+      return type in ['expense', 'special_income'];
+    }
+
+    function isCurrency(currency) {
+      return currency in ['adena', 'l_coin'];
+    }
+
+    function isNonNegativeInteger(value) {
+      return value is int && value >= 0;
+    }
+
+    function isPositiveInteger(value) {
+      return value is int && value > 0;
+    }
+
+    function hasBalances(data) {
+      return data.balances is map
+        && isNonNegativeInteger(data.balances.adena)
+        && isNonNegativeInteger(data.balances.lCoin);
+    }
+
+    function hasCurrentBalances(data) {
+      return data.currentBalances is map
+        && isNonNegativeInteger(data.currentBalances.adena)
+        && isNonNegativeInteger(data.currentBalances.lCoin);
+    }
+
+    match /users/{uid} {
+      allow read, delete: if isOwner(uid);
+      allow create, update: if isOwner(uid)
+        && request.resource.data.email is string
+        && request.resource.data.timezone is string
+        && request.resource.data.weekStartsOn == 1
+        && isTheme(request.resource.data.theme);
+
+      match /characters/{characterId} {
+        allow read, delete: if isOwner(uid);
+        allow create, update: if isOwner(uid)
+          && request.resource.data.nickname is string
+          && request.resource.data.nicknameNormalized is string
+          && isStatus(request.resource.data.status)
+          && hasCurrentBalances(request.resource.data)
+          && request.resource.data.lastSnapshotAt is timestamp
+          && request.resource.data.activePeriodId is string;
+
+        match /periods/{periodId} {
+          allow read, delete: if isOwner(uid);
+          allow create, update: if isOwner(uid)
+            && isPeriodStatus(request.resource.data.status)
+            && request.resource.data.plannedStartDate is string
+            && request.resource.data.plannedEndDate is string
+            && request.resource.data.openingSnapshotId is string
+            && request.resource.data.openedAt is timestamp;
+
+          match /snapshots/{snapshotId} {
+            allow read, delete: if isOwner(uid);
+            allow create, update: if isOwner(uid)
+              && isSnapshotKind(request.resource.data.kind)
+              && hasBalances(request.resource.data)
+              && request.resource.data.capturedAt is timestamp;
+          }
+
+          match /operations/{operationId} {
+            allow read, delete: if isOwner(uid);
+            allow create, update: if isOwner(uid)
+              && isOperationType(request.resource.data.type)
+              && isCurrency(request.resource.data.currency)
+              && isPositiveInteger(request.resource.data.amount)
+              && request.resource.data.category is string
+              && request.resource.data.occurredAt is timestamp
+              && (
+                request.resource.data.type != 'special_income'
+                || (
+                  request.resource.data.comment is string
+                  && request.resource.data.comment.size() > 0
+                )
+              );
+          }
+        }
+      }
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

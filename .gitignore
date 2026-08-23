@@ -1,0 +1,11 @@
+.env
+.env.local
+.env.*.local
+.next/
+node_modules/
+coverage/
+dist/
+*.log
+*.tsbuildinfo
+firebase-debug.log
+firestore-debug.log
