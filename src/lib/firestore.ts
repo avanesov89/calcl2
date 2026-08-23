@@ -365,12 +365,14 @@ export async function saveOperation(
   const operationRef = operationId
     ? doc(firestore, "users", uid, "characters", character.id, "periods", period.id, "operations", operationId)
     : doc(collection(firestore, "users", uid, "characters", character.id, "periods", period.id, "operations"));
+  // Compatibility with older deployed rules that required a non-empty comment for income operations.
+  const comment = input.comment?.trim() || (input.type === "special_income" ? " " : "");
   const payload = {
     type: input.type,
     currency: input.currency,
     amount,
     category: input.category,
-    comment: input.comment?.trim() || "",
+    comment,
     occurredAt: Timestamp.fromDate(input.occurredAt),
     updatedAt: serverTimestamp()
   };
