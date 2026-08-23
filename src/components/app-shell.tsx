@@ -2,12 +2,10 @@
 
 import {
   Archive,
-  Coins,
   DoorOpen,
   MoreHorizontal,
   Pencil,
   Plus,
-  Receipt,
   RefreshCw,
   Save,
   Trash2,
@@ -22,12 +20,12 @@ import {
   calculatePeriodSummary,
   getLastSnapshot,
   hasOperationsAfterLastSnapshot,
-  sortOperations
+  sortOperations,
+  sortSnapshots
 } from "@/lib/calculations";
 import { auth, hasFirebaseConfig, requireFirebase } from "@/lib/firebase";
 import { translateFirebaseError } from "@/lib/firebase-errors";
 import {
-  addSnapshot,
   closePeriod,
   createCharacter,
   deleteCharacterTree,
@@ -36,6 +34,7 @@ import {
   getOpenPeriod,
   reopenLastClosedPeriod,
   saveOperation,
+  saveSnapshot,
   setCharacterStatus,
   updateCharacter,
   updateProfileTheme
@@ -73,7 +72,7 @@ type SortDirection = "asc" | "desc";
 
 type ModalState =
   | { type: "character"; character?: CharacterRecord }
-  | { type: "snapshot"; character: CharacterRecord }
+  | { type: "snapshot"; character: CharacterRecord; snapshot?: SnapshotRecord }
   | { type: "expense"; character: CharacterRecord; operation?: OperationRecord }
   | { type: "special_income"; character: CharacterRecord; operation?: OperationRecord }
   | { type: "close"; character: CharacterRecord }
@@ -319,10 +318,11 @@ export default function AppShell() {
             <SnapshotForm
               character={modal.character}
               period={getOpenPeriod(modal.character)}
+              snapshot={modal.snapshot}
               onCancel={() => setModal(null)}
-              onSubmit={async (period, input) => {
-                await addSnapshot(currentUser.uid, modal.character, period, input);
-                await reloadWithNotice("Остаток сохранён.");
+              onSubmit={async (period, input, snapshotId) => {
+                await saveSnapshot(currentUser.uid, modal.character, period, input, snapshotId);
+                await reloadWithNotice(snapshotId ? "Замер обновлён." : "Остаток сохранён.");
                 setModal(null);
               }}
             />
@@ -809,40 +809,33 @@ function CharacterDetail({
             После последнего замера есть новые операции. Обновите остаток, чтобы получить актуальный результат.
           </div>
         ) : null}
-
-        <div className="button-row primary-actions">
-          <button type="button" onClick={() => setModal({ type: "snapshot", character })} disabled={!period}>
-            <RefreshCw size={15} />
-            Обновить остаток
-          </button>
-          <button className="secondary" type="button" onClick={() => setModal({ type: "expense", character })} disabled={!period}>
-            <Receipt size={15} />
-            Добавить расход
-          </button>
-          <button className="secondary" type="button" onClick={() => setModal({ type: "special_income", character })} disabled={!period}>
-            <Coins size={15} />
-            Добавить поступление
-          </button>
-          <button className="secondary" type="button" onClick={() => setModal({ type: "close", character })} disabled={!period}>
-            <Save size={15} />
-            Закрыть период
-          </button>
-        </div>
       </section>
 
       <section className="card">
         <div className="card-head">
-          <h2>Суточные результаты</h2>
-          {lastSnapshot ? <span className="small">Последний замер: {formatDateTime(lastSnapshot.capturedAt)}</span> : null}
+          <div>
+            <h2>Суточные результаты</h2>
+            {lastSnapshot ? <span className="small">Последний замер: {formatDateTime(lastSnapshot.capturedAt)}</span> : null}
+          </div>
+          <div className="button-row section-actions">
+            <button type="button" onClick={() => setModal({ type: "snapshot", character })} disabled={!period}>
+              <RefreshCw size={15} />
+              Обновить остаток
+            </button>
+            <button className="secondary" type="button" onClick={() => setModal({ type: "close", character })} disabled={!period}>
+              <Save size={15} />
+              Закрыть период
+            </button>
+          </div>
         </div>
         {!period || intervals.length === 0 ? (
-          <EmptyState
-            text="Сегодняшний результат появится после фиксации текущего остатка."
-            action="Обновить остаток"
-            onAction={() => setModal({ type: "snapshot", character })}
-          />
+          <EmptyState text="Сегодняшний результат появится после фиксации текущего остатка." />
         ) : (
-          <IntervalsTable intervals={intervals} selectedCurrency={selectedCurrency} />
+          <IntervalsTable
+            intervals={intervals}
+            selectedCurrency={selectedCurrency}
+            onEditSnapshot={(snapshot) => setModal({ type: "snapshot", character, snapshot })}
+          />
         )}
       </section>
 
@@ -851,26 +844,38 @@ function CharacterDetail({
           <h2>Операции периода</h2>
           <span className="small">{period ? formatYmdRange(period.plannedStartDate, period.plannedEndDate) : "Нет периода"}</span>
         </div>
-        <div className="row">
-          <div className="field">
-            <label htmlFor="operation-type-filter">Тип</label>
-            <select id="operation-type-filter" value={operationTypeFilter} onChange={(event) => setOperationTypeFilter(event.target.value as "all" | OperationType)}>
-              <option value="all">Все</option>
-              <option value="expense">Расходы</option>
-              <option value="special_income">Поступления</option>
-            </select>
+        <div className="table-toolbar">
+          <div className="row filter-row">
+            <div className="field">
+              <label htmlFor="operation-type-filter">Тип</label>
+              <select id="operation-type-filter" value={operationTypeFilter} onChange={(event) => setOperationTypeFilter(event.target.value as "all" | OperationType)}>
+                <option value="all">Все</option>
+                <option value="expense">Расходы</option>
+                <option value="special_income">Поступления</option>
+              </select>
+            </div>
+            <div className="field">
+              <label htmlFor="operation-currency-filter">Валюта</label>
+              <select
+                id="operation-currency-filter"
+                value={operationCurrencyFilter}
+                onChange={(event) => setOperationCurrencyFilter(event.target.value as "all" | OperationCurrency)}
+              >
+                <option value="all">Все</option>
+                <option value="adena">Адена</option>
+                <option value="l_coin">L-монеты</option>
+              </select>
+            </div>
           </div>
-          <div className="field">
-            <label htmlFor="operation-currency-filter">Валюта</label>
-            <select
-              id="operation-currency-filter"
-              value={operationCurrencyFilter}
-              onChange={(event) => setOperationCurrencyFilter(event.target.value as "all" | OperationCurrency)}
-            >
-              <option value="all">Все</option>
-              <option value="adena">Адена</option>
-              <option value="l_coin">L-монеты</option>
-            </select>
+          <div className="button-row section-actions">
+            <button className="secondary" type="button" onClick={() => setModal({ type: "expense", character })} disabled={!period}>
+              <Plus size={15} />
+              Расход
+            </button>
+            <button className="secondary" type="button" onClick={() => setModal({ type: "special_income", character })} disabled={!period}>
+              <Plus size={15} />
+              Поступление
+            </button>
           </div>
         </div>
         {!period || operations.length === 0 ? (
@@ -906,7 +911,7 @@ function CharacterDetail({
                       <IconButton title="Редактировать" onClick={() => setModal({ type: operation.type, character, operation })}>
                         <Pencil size={15} />
                       </IconButton>
-                      <IconButton title="Удалить" onClick={() => onDeleteOperation(character, period, operation)}>
+                      <IconButton title="Удалить" tone="danger" onClick={() => onDeleteOperation(character, period, operation)}>
                         <Trash2 size={15} />
                       </IconButton>
                     </td>
@@ -1111,30 +1116,41 @@ function CharacterForm({
 function SnapshotForm({
   character,
   period,
+  snapshot,
   onCancel,
   onSubmit
 }: {
   character: CharacterRecord;
   period: PeriodRecord | null;
+  snapshot?: SnapshotRecord;
   onCancel: () => void;
-  onSubmit: (period: PeriodRecord, input: { balances: { adena: number; lCoin: number }; capturedAt: Date; comment?: string }) => Promise<void>;
+  onSubmit: (
+    period: PeriodRecord,
+    input: { balances: { adena: number; lCoin: number }; capturedAt: Date; comment?: string },
+    snapshotId?: string
+  ) => Promise<void>;
 }) {
+  const orderedSnapshots = useMemo(() => (period ? sortSnapshots(period.snapshots) : []), [period]);
+  const snapshotIndex = snapshot ? orderedSnapshots.findIndex((item) => item.id === snapshot.id) : -1;
+  const previousSnapshot = snapshotIndex > 0 ? orderedSnapshots[snapshotIndex - 1] : null;
+  const nextSnapshot = snapshotIndex >= 0 ? orderedSnapshots[snapshotIndex + 1] ?? null : null;
   const lastSnapshot = period ? getLastSnapshot(period.snapshots) : null;
-  const [adena, setAdena] = useState(amountToInputValue(character.currentBalances.adena));
-  const [lCoin, setLCoin] = useState(amountToInputValue(character.currentBalances.lCoin));
-  const [capturedAt, setCapturedAt] = useState(formatInputDateTime());
-  const [comment, setComment] = useState("");
+  const comparisonSnapshot = snapshot ? previousSnapshot : lastSnapshot;
+  const [adena, setAdena] = useState(amountToInputValue(snapshot?.balances.adena ?? character.currentBalances.adena));
+  const [lCoin, setLCoin] = useState(amountToInputValue(snapshot?.balances.lCoin ?? character.currentBalances.lCoin));
+  const [capturedAt, setCapturedAt] = useState(formatInputDateTime(snapshot?.capturedAt));
+  const [comment, setComment] = useState(snapshot?.comment ?? "");
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const draftSnapshot = useMemo<SnapshotRecord | null>(() => {
-    if (!lastSnapshot) {
+    if (!comparisonSnapshot) {
       return null;
     }
 
     try {
       return {
-        id: "draft",
-        kind: "daily",
+        id: snapshot?.id ?? "draft",
+        kind: snapshot?.kind ?? "daily",
         balances: {
           adena: parseNonNegativeAmount(adena, "Текущая адена"),
           lCoin: parseNonNegativeAmount(lCoin, "Текущие L-монеты")
@@ -1147,8 +1163,8 @@ function SnapshotForm({
     } catch {
       return null;
     }
-  }, [adena, capturedAt, comment, lCoin, lastSnapshot]);
-  const preview = lastSnapshot && draftSnapshot && period ? calculateInterval(lastSnapshot, draftSnapshot, period.operations) : null;
+  }, [adena, capturedAt, comment, comparisonSnapshot, lCoin, snapshot]);
+  const preview = comparisonSnapshot && draftSnapshot && period ? calculateInterval(comparisonSnapshot, draftSnapshot, period.operations) : null;
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -1168,12 +1184,20 @@ function SnapshotForm({
         comment
       };
 
-      if (lastSnapshot && input.capturedAt.getTime() < lastSnapshot.capturedAt.getTime()) {
+      if (snapshot && previousSnapshot && input.capturedAt.getTime() < previousSnapshot.capturedAt.getTime()) {
+        throw new Error("Дата замера не может быть раньше предыдущего.");
+      }
+
+      if (snapshot && nextSnapshot && input.capturedAt.getTime() > nextSnapshot.capturedAt.getTime()) {
+        throw new Error("Дата замера не может быть позже следующего.");
+      }
+
+      if (!snapshot && lastSnapshot && input.capturedAt.getTime() < lastSnapshot.capturedAt.getTime()) {
         throw new Error("Новый замер не может быть раньше предыдущего.");
       }
 
       setSaving(true);
-      await onSubmit(period, input);
+      await onSubmit(period, input, snapshot?.id);
     } catch (caught) {
       setError(translateFirebaseError(caught));
     } finally {
@@ -1183,11 +1207,16 @@ function SnapshotForm({
 
   return (
     <form onSubmit={submit}>
-      <ModalHead title={`Обновить остаток · ${character.nickname}`} onCancel={onCancel} />
-      {lastSnapshot ? (
+      <ModalHead title={`${snapshot ? "Редактировать замер" : "Обновить остаток"} · ${character.nickname}`} onCancel={onCancel} />
+      {comparisonSnapshot ? (
         <div className="steps">
-          Предыдущий замер: <b>{formatDateTime(lastSnapshot.capturedAt)}</b>, адена <b>{formatInteger(lastSnapshot.balances.adena)}</b>, L-монеты{" "}
-          <b>{formatInteger(lastSnapshot.balances.lCoin)}</b>.
+          Предыдущий замер: <b>{formatDateTime(comparisonSnapshot.capturedAt)}</b>, адена <b>{formatInteger(comparisonSnapshot.balances.adena)}</b>, L-монеты{" "}
+          <b>{formatInteger(comparisonSnapshot.balances.lCoin)}</b>.
+        </div>
+      ) : null}
+      {snapshot && nextSnapshot ? (
+        <div className="steps">
+          Следующий замер: <b>{formatDateTime(nextSnapshot.capturedAt)}</b>. Дату исправляемого замера нужно оставить раньше него.
         </div>
       ) : null}
       <div className="row">
@@ -1216,7 +1245,7 @@ function SnapshotForm({
         </div>
       ) : null}
       <div className="err">{error}</div>
-      <FormActions onCancel={onCancel} saving={saving} submitLabel="Сохранить замер" />
+      <FormActions onCancel={onCancel} saving={saving} submitLabel={snapshot ? "Сохранить" : "Сохранить замер"} />
     </form>
   );
 }
@@ -1543,7 +1572,15 @@ function SummaryStats({
   );
 }
 
-function IntervalsTable({ intervals, selectedCurrency }: { intervals: ReturnType<typeof buildIntervals>; selectedCurrency: Currency }) {
+function IntervalsTable({
+  intervals,
+  selectedCurrency,
+  onEditSnapshot
+}: {
+  intervals: ReturnType<typeof buildIntervals>;
+  selectedCurrency: Currency;
+  onEditSnapshot?: (snapshot: SnapshotRecord) => void;
+}) {
   return (
     <div className="table-wrap">
       <table>
@@ -1558,6 +1595,7 @@ function IntervalsTable({ intervals, selectedCurrency }: { intervals: ReturnType
             <th className="right">Обычный фарм</th>
             <th className="right">Результат</th>
             <th>Статус</th>
+            {onEditSnapshot ? <th>Действия</th> : null}
           </tr>
         </thead>
         <tbody>
@@ -1584,6 +1622,13 @@ function IntervalsTable({ intervals, selectedCurrency }: { intervals: ReturnType
                     {interval.status === "closed" ? "Закрыто" : "Предварительно"}
                   </span>
                 </td>
+                {onEditSnapshot ? (
+                  <td className="actions-cell">
+                    <IconButton title="Редактировать замер" onClick={() => onEditSnapshot(interval.endSnapshot)}>
+                      <Pencil size={15} />
+                    </IconButton>
+                  </td>
+                ) : null}
               </tr>
             );
           })}
@@ -1648,14 +1693,16 @@ function SortableTh({
   );
 }
 
-function EmptyState({ text, action, onAction }: { text: string; action: string; onAction: () => void }) {
+function EmptyState({ text, action, onAction }: { text: string; action?: string; onAction?: () => void }) {
   return (
     <div className="empty-state">
       <p>{text}</p>
-      <button type="button" onClick={onAction}>
-        <Plus size={15} />
-        {action}
-      </button>
+      {action && onAction ? (
+        <button type="button" onClick={onAction}>
+          <Plus size={15} />
+          {action}
+        </button>
+      ) : null}
     </div>
   );
 }
@@ -1719,9 +1766,19 @@ function AmountInput({ id, value, onChange }: { id: string; value: string; onCha
   );
 }
 
-function IconButton({ title, children, onClick }: { title: string; children: ReactNode; onClick: () => void }) {
+function IconButton({
+  title,
+  children,
+  tone = "neutral",
+  onClick
+}: {
+  title: string;
+  children: ReactNode;
+  tone?: "neutral" | "danger";
+  onClick: () => void;
+}) {
   return (
-    <button className="icon-btn" type="button" title={title} aria-label={title} onClick={onClick}>
+    <button className={tone === "danger" ? "icon-btn danger-icon" : "icon-btn"} type="button" title={title} aria-label={title} onClick={onClick}>
       {children}
     </button>
   );

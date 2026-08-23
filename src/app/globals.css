@@ -122,8 +122,13 @@ button.icon-btn {
 }
 
 button.icon-btn:hover:not(:disabled) {
-  color: var(--red);
+  color: var(--accent);
   filter: none;
+}
+
+button.icon-btn.danger-icon,
+button.icon-btn.danger-icon:hover:not(:disabled) {
+  color: var(--red);
 }
 
 button.copy-btn {
@@ -323,6 +328,24 @@ h2 {
 }
 
 .compact-row {
+  margin-bottom: 0;
+}
+
+.section-actions {
+  justify-content: flex-end;
+  margin-left: auto;
+}
+
+.table-toolbar {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.filter-row {
   margin-bottom: 0;
 }
 
@@ -566,10 +589,6 @@ tr:hover td {
   margin-bottom: 0;
 }
 
-.primary-actions {
-  margin-top: 14px;
-}
-
 .modal-backdrop {
   position: fixed;
   inset: 0;
@@ -607,8 +626,10 @@ tr:hover td {
 
   .topbar-actions,
   .button-row,
-  .form-actions {
+  .form-actions,
+  .table-toolbar {
     align-items: stretch;
+    flex-direction: column;
   }
 
   .topbar-actions > *,
@@ -623,6 +644,11 @@ tr:hover td {
   .theme-field {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .section-actions {
+    width: 100%;
+    margin-left: 0;
   }
 
   .card {

@@ -241,39 +241,109 @@ export async function deleteCharacterTree(uid: string, character: CharacterRecor
   await batch.commit();
 }
 
-export async function addSnapshot(
+export async function saveSnapshot(
   uid: string,
   character: CharacterRecord,
   period: PeriodRecord,
-  input: SnapshotInput
+  input: SnapshotInput,
+  snapshotId?: string
 ): Promise<void> {
   const { db: firestore } = requireFirebase();
-  const lastSnapshot = getLastSnapshot(period.snapshots);
+  const orderedSnapshots = sortSnapshots(period.snapshots);
+  const targetSnapshot = snapshotId ? orderedSnapshots.find((snapshot) => snapshot.id === snapshotId) : null;
 
-  if (lastSnapshot && input.capturedAt.getTime() < lastSnapshot.capturedAt.getTime()) {
-    throw new Error("Новый замер не может быть раньше предыдущего без режима исправления истории.");
+  if (snapshotId && !targetSnapshot) {
+    throw new Error("Замер не найден.");
+  }
+
+  if (targetSnapshot) {
+    const targetIndex = orderedSnapshots.findIndex((snapshot) => snapshot.id === targetSnapshot.id);
+    const previousSnapshot = orderedSnapshots[targetIndex - 1] ?? null;
+    const nextSnapshot = orderedSnapshots[targetIndex + 1] ?? null;
+
+    if (previousSnapshot && input.capturedAt.getTime() < previousSnapshot.capturedAt.getTime()) {
+      throw new Error("Дата замера не может быть раньше предыдущего замера.");
+    }
+
+    if (nextSnapshot && input.capturedAt.getTime() > nextSnapshot.capturedAt.getTime()) {
+      throw new Error("Дата замера не может быть позже следующего замера.");
+    }
+  } else {
+    const lastSnapshot = getLastSnapshot(period.snapshots);
+
+    if (lastSnapshot && input.capturedAt.getTime() < lastSnapshot.capturedAt.getTime()) {
+      throw new Error("Новый замер не может быть раньше предыдущего без режима исправления истории.");
+    }
   }
 
   const balances = normalizeBalances(input.balances);
-  const snapshotRef = doc(
-    collection(firestore, "users", uid, "characters", character.id, "periods", period.id, "snapshots")
-  );
+  const periodRef = doc(firestore, "users", uid, "characters", character.id, "periods", period.id);
+  const snapshotRef = snapshotId
+    ? doc(periodRef, "snapshots", snapshotId)
+    : doc(collection(periodRef, "snapshots"));
   const batch = writeBatch(firestore);
   const now = serverTimestamp();
-
-  batch.set(snapshotRef, {
-    kind: input.kind ?? "daily",
+  const snapshotPayload = {
+    kind: targetSnapshot?.kind ?? input.kind ?? "daily",
     balances,
     capturedAt: Timestamp.fromDate(input.capturedAt),
     comment: input.comment?.trim() || "",
-    createdAt: now,
     updatedAt: now
-  });
+  };
+
+  if (snapshotId) {
+    batch.update(snapshotRef, snapshotPayload);
+  } else {
+    batch.set(snapshotRef, {
+      ...snapshotPayload,
+      createdAt: now
+    });
+  }
+
+  const updatedSnapshots = snapshotId
+    ? period.snapshots.map((snapshot) =>
+        snapshot.id === snapshotId
+          ? {
+              ...snapshot,
+              kind: snapshotPayload.kind,
+              balances,
+              capturedAt: input.capturedAt,
+              comment: input.comment?.trim() || ""
+            }
+          : snapshot
+      )
+    : [
+        ...period.snapshots,
+        {
+          id: snapshotRef.id,
+          kind: snapshotPayload.kind,
+          balances,
+          capturedAt: input.capturedAt,
+          comment: input.comment?.trim() || "",
+          createdAt: new Date(),
+          updatedAt: new Date()
+        }
+      ];
+  const latestSnapshot = getLastSnapshot(updatedSnapshots);
+
   batch.update(doc(firestore, "users", uid, "characters", character.id), {
-    currentBalances: balances,
-    lastSnapshotAt: Timestamp.fromDate(input.capturedAt),
+    currentBalances: latestSnapshot?.balances ?? balances,
+    lastSnapshotAt: Timestamp.fromDate(latestSnapshot?.capturedAt ?? input.capturedAt),
     updatedAt: now
   });
+  batch.update(
+    periodRef,
+    snapshotId === period.openingSnapshotId
+      ? {
+          openedAt: Timestamp.fromDate(input.capturedAt),
+          plannedStartDate: toYmd(input.capturedAt),
+          plannedEndDate: toYmd(addDays(input.capturedAt, 6)),
+          updatedAt: now
+        }
+      : {
+          updatedAt: now
+        }
+  );
 
   await batch.commit();
 }
