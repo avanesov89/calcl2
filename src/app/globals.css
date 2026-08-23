@@ -361,29 +361,57 @@ h3 {
 
 .inline-operation-form {
   margin: 0 0 12px;
-  padding: 12px 0;
+  padding: 10px 0;
   border-top: 1px solid var(--border);
   border-bottom: 1px solid var(--border);
 }
 
-.inline-form-head,
-.inline-form-actions {
+.inline-operation-row {
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 10px;
+  align-items: flex-end;
+  gap: 8px;
   flex-wrap: wrap;
   margin-bottom: 10px;
 }
 
-.inline-form-head .subtitle {
-  margin-bottom: 0;
+.inline-operation-title {
+  flex: 0 0 130px;
+  padding-bottom: 6px;
+}
+
+.inline-operation-title span {
+  color: var(--muted);
+  font-size: 12px;
 }
 
 .inline-form-actions {
-  justify-content: flex-end;
-  margin-top: 10px;
-  margin-bottom: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-bottom: 1px;
+}
+
+.compact-currency {
+  flex: 0 0 112px;
+}
+
+.compact-category {
+  flex: 0 0 170px;
+}
+
+.compact-comment {
+  flex: 1 1 170px;
+}
+
+.inline-operation-row input,
+.inline-operation-row select {
+  width: 100%;
+  min-width: 0;
+}
+
+.inline-operation-row .amount-input {
+  width: 150px;
+  min-width: 0;
 }
 
 .field {
@@ -688,6 +716,20 @@ tr:hover td {
   .section-actions {
     width: 100%;
     margin-left: 0;
+  }
+
+  .inline-operation-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .inline-operation-title,
+  .compact-currency,
+  .compact-category,
+  .compact-comment,
+  .inline-operation-row .amount-input {
+    width: 100%;
+    flex-basis: auto;
   }
 
   .card {

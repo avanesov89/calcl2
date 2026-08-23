@@ -1348,17 +1348,12 @@ function InlineOperationForm({
 
   return (
     <form className="inline-operation-form" onSubmit={submit}>
-      <div className="inline-form-head">
-        <div>
+      <div className="inline-operation-row">
+        <div className="inline-operation-title">
           <h3>{type === "expense" ? "Новый расход" : "Новое поступление"}</h3>
-          <p className="subtitle">{character.nickname}</p>
+          <span>{character.nickname}</span>
         </div>
-        <IconButton title="Скрыть форму" onClick={onCancel}>
-          <X size={16} />
-        </IconButton>
-      </div>
-      <div className="row">
-        <div className="field">
+        <div className="field compact-currency">
           <label htmlFor={`quick-operation-currency-${type}`}>Валюта</label>
           <select id={`quick-operation-currency-${type}`} value={currency} onChange={(event) => setCurrency(event.target.value as OperationCurrency)}>
             <option value="adena">Адена</option>
@@ -1369,7 +1364,7 @@ function InlineOperationForm({
           <label htmlFor={`quick-operation-amount-${type}`}>Сумма</label>
           <AmountInput id={`quick-operation-amount-${type}`} value={amount} onChange={setAmount} />
         </div>
-        <div className="field grow">
+        <div className="field compact-category">
           <label htmlFor={`quick-operation-category-${type}`}>Категория</label>
           <select id={`quick-operation-category-${type}`} value={category} onChange={(event) => setCategory(event.target.value)}>
             {categories.map((item) => (
@@ -1383,10 +1378,19 @@ function InlineOperationForm({
           <label htmlFor={`quick-operation-date-${type}`}>Дата и время</label>
           <input id={`quick-operation-date-${type}`} type="datetime-local" value={occurredAt} onChange={(event) => setOccurredAt(event.target.value)} />
         </div>
-      </div>
-      <div className="field">
-        <label htmlFor={`quick-operation-comment-${type}`}>Комментарий</label>
-        <input id={`quick-operation-comment-${type}`} type="text" value={comment} onChange={(event) => setComment(event.target.value)} />
+        <div className="field compact-comment">
+          <label htmlFor={`quick-operation-comment-${type}`}>Комментарий</label>
+          <input id={`quick-operation-comment-${type}`} type="text" value={comment} onChange={(event) => setComment(event.target.value)} />
+        </div>
+        <div className="inline-form-actions">
+          <button type="submit" disabled={saving}>
+            <Save size={15} />
+            {saving ? "Сохраняем..." : "Добавить"}
+          </button>
+          <IconButton title="Скрыть форму" onClick={onCancel}>
+            <X size={16} />
+          </IconButton>
+        </div>
       </div>
       {type === "special_income" ? (
         <div className="steps">Поступление уже должно входить в фактический остаток. Эта запись только выделит его из обычного фарма.</div>
@@ -1394,15 +1398,6 @@ function InlineOperationForm({
       {isAfterLastSnapshot ? (
         <div className="steps warn">Операция позже последнего замера. Она попадёт в расчёт после обновления остатка.</div>
       ) : null}
-      <div className="inline-form-actions">
-        <button className="ghost" type="button" onClick={onCancel} disabled={saving}>
-          Отмена
-        </button>
-        <button type="submit" disabled={saving}>
-          <Save size={15} />
-          {saving ? "Сохраняем..." : "Добавить"}
-        </button>
-      </div>
       <div className="err">{error}</div>
     </form>
   );
