@@ -4,7 +4,7 @@ import {
   Archive,
   Coins,
   DoorOpen,
-  History,
+  MoreHorizontal,
   Pencil,
   Plus,
   Receipt,
@@ -255,7 +255,6 @@ export default function AppShell() {
           selectedCharacter={selectedCharacter}
           selectedCurrency={selectedCurrency}
           setSelectedCurrency={setSelectedCurrency}
-          setSelectedCharacterId={setSelectedCharacterId}
           setModal={setModal}
           timezone={timezone}
           onArchive={async (character) => {
@@ -616,7 +615,6 @@ function Overview({
                   <SortableTh active={sortKey === "lastSnapshotAt"} direction={sortDirection} onClick={() => toggleSort("lastSnapshotAt")}>
                     Последний замер
                   </SortableTh>
-                  <th>Действия</th>
                 </tr>
               </thead>
               <tbody>
@@ -644,23 +642,6 @@ function Overview({
                         <span className={hasUncounted ? "pill amber" : "date-cell"}>{formatDateTime(character.lastSnapshotAt)}</span>
                         {hasUncounted ? <div className="small">Есть неучтённые операции</div> : null}
                       </td>
-                      <td className="actions-cell">
-                        <IconButton title="Открыть" onClick={() => onOpenCharacter(character)}>
-                          <History size={15} />
-                        </IconButton>
-                        <IconButton title="Обновить остаток" onClick={() => setModal({ type: "snapshot", character })}>
-                          <RefreshCw size={15} />
-                        </IconButton>
-                        <IconButton title="Добавить расход" onClick={() => setModal({ type: "expense", character })}>
-                          <Receipt size={15} />
-                        </IconButton>
-                        <IconButton title="Добавить поступление" onClick={() => setModal({ type: "special_income", character })}>
-                          <Coins size={15} />
-                        </IconButton>
-                        <IconButton title="Редактировать" onClick={() => setModal({ type: "character", character })}>
-                          <Pencil size={15} />
-                        </IconButton>
-                      </td>
                     </tr>
                   );
                 })}
@@ -678,7 +659,6 @@ function CharactersScreen({
   selectedCharacter,
   selectedCurrency,
   setSelectedCurrency,
-  setSelectedCharacterId,
   setModal,
   timezone,
   onArchive,
@@ -689,7 +669,6 @@ function CharactersScreen({
   selectedCharacter: CharacterRecord | null;
   selectedCurrency: Currency;
   setSelectedCurrency: (currency: Currency) => void;
-  setSelectedCharacterId: (id: string) => void;
   setModal: (modal: ModalState) => void;
   timezone: string;
   onArchive: (character: CharacterRecord) => Promise<void>;
@@ -710,24 +689,6 @@ function CharactersScreen({
 
   return (
     <>
-      <section className="card">
-        <div className="row compact-row">
-          <div className="field">
-            <label htmlFor="character-select">Персонаж</label>
-            <select id="character-select" value={selectedCharacter?.id ?? ""} onChange={(event) => setSelectedCharacterId(event.target.value)}>
-              {characters.map((character) => (
-                <option key={character.id} value={character.id}>
-                  {character.nickname} {character.status === "archived" ? "(архив)" : ""}
-                </option>
-              ))}
-            </select>
-          </div>
-          <button type="button" onClick={() => setModal({ type: "character" })}>
-            <Plus size={15} />
-            Добавить персонажа
-          </button>
-        </div>
-      </section>
       {selectedCharacter ? (
         <CharacterDetail
           character={selectedCharacter}
@@ -765,6 +726,7 @@ function CharacterDetail({
 }) {
   const [operationTypeFilter, setOperationTypeFilter] = useState<"all" | OperationType>("all");
   const [operationCurrencyFilter, setOperationCurrencyFilter] = useState<"all" | OperationCurrency>("all");
+  const [isCharacterMenuOpen, setIsCharacterMenuOpen] = useState(false);
   const period = getOpenPeriod(character);
   const summary = period ? calculatePeriodSummary(period.snapshots, period.operations) : null;
   const intervals = period ? [...buildIntervals(period.snapshots, period.operations, "preliminary", timezone)].reverse() : [];
@@ -788,19 +750,50 @@ function CharacterDetail({
               {character.server ? `${character.server} · ` : ""}последний замер {formatDateTime(character.lastSnapshotAt)}
             </p>
           </div>
-          <div className="button-row">
-            <button className="ghost" type="button" onClick={() => setModal({ type: "character", character })}>
-              <Pencil size={15} />
-              Редактировать
-            </button>
-            <button className="ghost" type="button" onClick={() => onArchive(character)}>
-              <Archive size={15} />
-              {character.status === "archived" ? "Вернуть" : "Архивировать"}
-            </button>
-            <button className="danger" type="button" onClick={() => onDelete(character)}>
-              <Trash2 size={15} />
-              Удалить
-            </button>
+          <div className="menu-wrap">
+            <IconButton title="Действия персонажа" onClick={() => setIsCharacterMenuOpen((isOpen) => !isOpen)}>
+              <MoreHorizontal size={17} />
+            </IconButton>
+            {isCharacterMenuOpen ? (
+              <div className="menu-popover" role="menu">
+                <button
+                  className="menu-item"
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setIsCharacterMenuOpen(false);
+                    setModal({ type: "character", character });
+                  }}
+                >
+                  <Pencil size={15} />
+                  Редактировать
+                </button>
+                <button
+                  className="menu-item"
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setIsCharacterMenuOpen(false);
+                    void onArchive(character);
+                  }}
+                >
+                  <Archive size={15} />
+                  {character.status === "archived" ? "Вернуть из архива" : "Архивировать"}
+                </button>
+                <button
+                  className="menu-item danger"
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setIsCharacterMenuOpen(false);
+                    void onDelete(character);
+                  }}
+                >
+                  <Trash2 size={15} />
+                  Удалить
+                </button>
+              </div>
+            ) : null}
           </div>
         </div>
 
