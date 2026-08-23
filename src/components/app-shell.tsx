@@ -22,7 +22,8 @@ import {
   getLastSnapshot,
   hasOperationsAfterLastSnapshot,
   sortOperations,
-  sortSnapshots
+  sortSnapshots,
+  sumCurrencySummaries
 } from "@/lib/calculations";
 import { auth, hasFirebaseConfig, requireFirebase } from "@/lib/firebase";
 import { translateFirebaseError } from "@/lib/firebase-errors";
@@ -538,6 +539,23 @@ function CharactersListScreen({
   const [sortKey, setSortKey] = useState<SortKey>("nickname");
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
   const [isCharacterFormOpen, setIsCharacterFormOpen] = useState(false);
+  const totals = useMemo(() => {
+    const balances = { adena: 0, lCoin: 0 };
+    const summaries: PeriodSummary[] = [];
+
+    for (const character of characters) {
+      balances.adena += character.currentBalances.adena;
+      balances.lCoin += character.currentBalances.lCoin;
+
+      const period = getOpenPeriod(character);
+
+      if (period) {
+        summaries.push(calculatePeriodSummary(period.snapshots, period.operations));
+      }
+    }
+
+    return { balances, summary: sumCurrencySummaries(summaries) };
+  }, [characters]);
   const rows = useMemo(() => {
     const prepared = characters.map((character) => {
       const period = getOpenPeriod(character);
@@ -591,96 +609,108 @@ function CharactersListScreen({
   }
 
   return (
-    <section className="card">
-      <div className="card-head">
-        <div>
-          <h2>Персонажи</h2>
-          <span className="small">Выберите персонажа, чтобы открыть его обзор и операции.</span>
+    <>
+      <section className="card">
+        <div className="card-head">
+          <div>
+            <h2>Общий обзор</h2>
+            <p className="subtitle">Сумма всех активных персонажей и их текущих недель.</p>
+          </div>
         </div>
-        <div className="button-row section-actions">
-          <CurrencyTabs value={selectedCurrency} onChange={setSelectedCurrency} compact />
-          <button
-            className={isCharacterFormOpen ? "secondary active-secondary" : "secondary"}
-            type="button"
-            onClick={() => setIsCharacterFormOpen((isOpen) => !isOpen)}
-          >
-            <Plus size={15} />
-            Добавить персонажа
-          </button>
-        </div>
-      </div>
-      {isCharacterFormOpen ? (
-        <InlineCharacterForm
-          onCancel={() => setIsCharacterFormOpen(false)}
-          onSubmit={async (input) => {
-            await onCreateCharacter(input);
-            setIsCharacterFormOpen(false);
-          }}
-        />
-      ) : null}
-      {characters.length === 0 ? (
-        <EmptyState text="Добавьте первого персонажа и укажите его текущие остатки, чтобы начать учёт." />
-      ) : (
-        <div className="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <SortableTh active={sortKey === "nickname"} direction={sortDirection} onClick={() => toggleSort("nickname")}>
-                  Персонаж
-                </SortableTh>
-                <SortableTh active={sortKey === "balance"} direction={sortDirection} onClick={() => toggleSort("balance")} alignRight>
-                  Текущий остаток
-                </SortableTh>
-                <SortableTh active={sortKey === "interval"} direction={sortDirection} onClick={() => toggleSort("interval")} alignRight>
-                  Сегодня/интервал
-                </SortableTh>
-                <SortableTh active={sortKey === "week"} direction={sortDirection} onClick={() => toggleSort("week")} alignRight>
-                  Текущая неделя
-                </SortableTh>
-                <SortableTh active={sortKey === "expenses"} direction={sortDirection} onClick={() => toggleSort("expenses")} alignRight>
-                  Расходы недели
-                </SortableTh>
-                <SortableTh active={sortKey === "specialIncome"} direction={sortDirection} onClick={() => toggleSort("specialIncome")} alignRight>
-                  Крупные поступления
-                </SortableTh>
-                <SortableTh active={sortKey === "lastSnapshotAt"} direction={sortDirection} onClick={() => toggleSort("lastSnapshotAt")}>
-                  Последний остаток
-                </SortableTh>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map(({ character, period, summary, lastInterval }) => {
-                const hasUncounted = period ? hasOperationsAfterLastSnapshot(period.snapshots, period.operations) : false;
-                const net = summary?.[selectedCurrency].netResult ?? 0;
-                const intervalNet = lastInterval?.summary[selectedCurrency].netResult ?? 0;
+        <CurrencyTabs value={selectedCurrency} onChange={setSelectedCurrency} />
+        <SummaryStats balances={totals.balances} summary={totals.summary} selectedCurrency={selectedCurrency} />
+      </section>
 
-                return (
-                  <tr key={character.id}>
-                    <td>
-                      <button className="link-btn" type="button" onClick={() => onOpenCharacter(character)}>
-                        {character.nickname}
-                      </button>
-                      {character.server ? <div className="small">{character.server}</div> : null}
-                    </td>
-                    <td className="num-cell" title={formatInteger(character.currentBalances[selectedCurrency])}>
-                      {formatInteger(character.currentBalances[selectedCurrency])}
-                    </td>
-                    <td className={`num-cell ${resultClassName(intervalNet)}`}>{lastInterval ? formatSignedInteger(intervalNet) : "—"}</td>
-                    <td className={`num-cell ${resultClassName(net)}`}>{summary ? formatSignedInteger(net) : "—"}</td>
-                    <td className="num-cell">{summary ? formatInteger(summary[selectedCurrency].expenses) : "—"}</td>
-                    <td className="num-cell">{summary ? formatInteger(summary[selectedCurrency].specialIncome) : "—"}</td>
-                    <td>
-                      <span className={hasUncounted ? "pill amber" : "date-cell"}>{formatDateTime(character.lastSnapshotAt)}</span>
-                      {hasUncounted ? <div className="small">Есть операции после остатка</div> : null}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+      <section className="card">
+        <div className="card-head">
+          <div>
+            <h2>Персонажи</h2>
+            <span className="small">Выберите персонажа, чтобы открыть его обзор и операции. Валюта таблицы: {currencyLabels[selectedCurrency]}.</span>
+          </div>
+          <div className="button-row section-actions">
+            <button
+              className={isCharacterFormOpen ? "secondary active-secondary" : "secondary"}
+              type="button"
+              onClick={() => setIsCharacterFormOpen((isOpen) => !isOpen)}
+            >
+              <Plus size={15} />
+              Добавить персонажа
+            </button>
+          </div>
         </div>
-      )}
-    </section>
+        {isCharacterFormOpen ? (
+          <InlineCharacterForm
+            onCancel={() => setIsCharacterFormOpen(false)}
+            onSubmit={async (input) => {
+              await onCreateCharacter(input);
+              setIsCharacterFormOpen(false);
+            }}
+          />
+        ) : null}
+        {characters.length === 0 ? (
+          <EmptyState text="Добавьте первого персонажа и укажите его текущие остатки, чтобы начать учёт." />
+        ) : (
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <SortableTh active={sortKey === "nickname"} direction={sortDirection} onClick={() => toggleSort("nickname")}>
+                    Персонаж
+                  </SortableTh>
+                  <SortableTh active={sortKey === "balance"} direction={sortDirection} onClick={() => toggleSort("balance")} alignRight>
+                    Текущий остаток
+                  </SortableTh>
+                  <SortableTh active={sortKey === "interval"} direction={sortDirection} onClick={() => toggleSort("interval")} alignRight>
+                    Сегодня/интервал
+                  </SortableTh>
+                  <SortableTh active={sortKey === "week"} direction={sortDirection} onClick={() => toggleSort("week")} alignRight>
+                    Текущая неделя
+                  </SortableTh>
+                  <SortableTh active={sortKey === "expenses"} direction={sortDirection} onClick={() => toggleSort("expenses")} alignRight>
+                    Расходы недели
+                  </SortableTh>
+                  <SortableTh active={sortKey === "specialIncome"} direction={sortDirection} onClick={() => toggleSort("specialIncome")} alignRight>
+                    Крупные поступления
+                  </SortableTh>
+                  <SortableTh active={sortKey === "lastSnapshotAt"} direction={sortDirection} onClick={() => toggleSort("lastSnapshotAt")}>
+                    Последний остаток
+                  </SortableTh>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map(({ character, period, summary, lastInterval }) => {
+                  const hasUncounted = period ? hasOperationsAfterLastSnapshot(period.snapshots, period.operations) : false;
+                  const net = summary?.[selectedCurrency].netResult ?? 0;
+                  const intervalNet = lastInterval?.summary[selectedCurrency].netResult ?? 0;
+
+                  return (
+                    <tr key={character.id}>
+                      <td>
+                        <button className="link-btn" type="button" onClick={() => onOpenCharacter(character)}>
+                          {character.nickname}
+                        </button>
+                        {character.server ? <div className="small">{character.server}</div> : null}
+                      </td>
+                      <td className="num-cell" title={formatInteger(character.currentBalances[selectedCurrency])}>
+                        {formatInteger(character.currentBalances[selectedCurrency])}
+                      </td>
+                      <td className={`num-cell ${resultClassName(intervalNet)}`}>{lastInterval ? formatSignedInteger(intervalNet) : "—"}</td>
+                      <td className={`num-cell ${resultClassName(net)}`}>{summary ? formatSignedInteger(net) : "—"}</td>
+                      <td className="num-cell">{summary ? formatInteger(summary[selectedCurrency].expenses) : "—"}</td>
+                      <td className="num-cell">{summary ? formatInteger(summary[selectedCurrency].specialIncome) : "—"}</td>
+                      <td>
+                        <span className={hasUncounted ? "pill amber" : "date-cell"}>{formatDateTime(character.lastSnapshotAt)}</span>
+                        {hasUncounted ? <div className="small">Есть операции после остатка</div> : null}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+    </>
   );
 }
 
