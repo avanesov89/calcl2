@@ -93,6 +93,11 @@ button.secondary {
   color: var(--accent);
 }
 
+button.secondary.active-secondary {
+  background: var(--accent);
+  color: var(--btn-text);
+}
+
 button.danger {
   background: var(--red-bg);
   color: var(--red);
@@ -182,6 +187,11 @@ h1 {
 h2 {
   margin: 0 0 10px;
   font-size: 15px;
+}
+
+h3 {
+  margin: 0 0 4px;
+  font-size: 14px;
 }
 
 .app {
@@ -346,6 +356,33 @@ h2 {
 }
 
 .filter-row {
+  margin-bottom: 0;
+}
+
+.inline-operation-form {
+  margin: 0 0 12px;
+  padding: 12px 0;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+
+.inline-form-head,
+.inline-form-actions {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.inline-form-head .subtitle {
+  margin-bottom: 0;
+}
+
+.inline-form-actions {
+  justify-content: flex-end;
+  margin-top: 10px;
   margin-bottom: 0;
 }
 
@@ -627,6 +664,7 @@ tr:hover td {
   .topbar-actions,
   .button-row,
   .form-actions,
+  .inline-form-actions,
   .table-toolbar {
     align-items: stretch;
     flex-direction: column;
@@ -635,6 +673,7 @@ tr:hover td {
   .topbar-actions > *,
   .button-row > button,
   .form-actions > button,
+  .inline-form-actions > button,
   .row .field,
   .row input,
   .row select {

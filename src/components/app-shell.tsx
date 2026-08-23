@@ -3,6 +3,7 @@
 import {
   Archive,
   DoorOpen,
+  Minus,
   MoreHorizontal,
   Pencil,
   Plus,
@@ -78,6 +79,15 @@ type ModalState =
   | { type: "close"; character: CharacterRecord }
   | { type: "period"; character: CharacterRecord; period: PeriodRecord }
   | null;
+
+type OperationFormInput = {
+  type: OperationType;
+  currency: OperationCurrency;
+  amount: number;
+  category: string;
+  comment?: string;
+  occurredAt: Date;
+};
 
 const expenseCategories = ["руда", "заряды души", "банки/расходники", "телепорты", "экипировка", "комиссия", "другое"];
 const specialIncomeCategories = ["продажа крупного дропа", "продажа предмета", "награда", "другое"];
@@ -276,6 +286,10 @@ export default function AppShell() {
 
             await deleteOperation(currentUser.uid, character, period, operation.id);
             await reloadWithNotice("Операция удалена.");
+          }}
+          onSaveOperation={async (character, period, input, operationId) => {
+            await saveOperation(currentUser.uid, character, period, input, operationId);
+            await reloadWithNotice(operationId ? "Операция обновлена." : "Операция добавлена.");
           }}
         />
       ) : null}
@@ -663,7 +677,8 @@ function CharactersScreen({
   timezone,
   onArchive,
   onDelete,
-  onDeleteOperation
+  onDeleteOperation,
+  onSaveOperation
 }: {
   characters: CharacterRecord[];
   selectedCharacter: CharacterRecord | null;
@@ -674,6 +689,7 @@ function CharactersScreen({
   onArchive: (character: CharacterRecord) => Promise<void>;
   onDelete: (character: CharacterRecord) => Promise<void>;
   onDeleteOperation: (character: CharacterRecord, period: PeriodRecord, operation: OperationRecord) => Promise<void>;
+  onSaveOperation: (character: CharacterRecord, period: PeriodRecord, input: OperationFormInput, operationId?: string) => Promise<void>;
 }) {
   if (characters.length === 0) {
     return (
@@ -691,6 +707,7 @@ function CharactersScreen({
     <>
       {selectedCharacter ? (
         <CharacterDetail
+          key={selectedCharacter.id}
           character={selectedCharacter}
           selectedCurrency={selectedCurrency}
           setSelectedCurrency={setSelectedCurrency}
@@ -699,6 +716,7 @@ function CharactersScreen({
           onArchive={onArchive}
           onDelete={onDelete}
           onDeleteOperation={onDeleteOperation}
+          onSaveOperation={onSaveOperation}
         />
       ) : null}
     </>
@@ -713,7 +731,8 @@ function CharacterDetail({
   timezone,
   onArchive,
   onDelete,
-  onDeleteOperation
+  onDeleteOperation,
+  onSaveOperation
 }: {
   character: CharacterRecord;
   selectedCurrency: Currency;
@@ -723,10 +742,12 @@ function CharacterDetail({
   onArchive: (character: CharacterRecord) => Promise<void>;
   onDelete: (character: CharacterRecord) => Promise<void>;
   onDeleteOperation: (character: CharacterRecord, period: PeriodRecord, operation: OperationRecord) => Promise<void>;
+  onSaveOperation: (character: CharacterRecord, period: PeriodRecord, input: OperationFormInput, operationId?: string) => Promise<void>;
 }) {
   const [operationTypeFilter, setOperationTypeFilter] = useState<"all" | OperationType>("all");
   const [operationCurrencyFilter, setOperationCurrencyFilter] = useState<"all" | OperationCurrency>("all");
   const [isCharacterMenuOpen, setIsCharacterMenuOpen] = useState(false);
+  const [quickOperationType, setQuickOperationType] = useState<OperationType | null>(null);
   const period = getOpenPeriod(character);
   const summary = period ? calculatePeriodSummary(period.snapshots, period.operations) : null;
   const intervals = period ? [...buildIntervals(period.snapshots, period.operations, "preliminary", timezone)].reverse() : [];
@@ -868,16 +889,39 @@ function CharacterDetail({
             </div>
           </div>
           <div className="button-row section-actions">
-            <button className="secondary" type="button" onClick={() => setModal({ type: "expense", character })} disabled={!period}>
-              <Plus size={15} />
+            <button
+              className={quickOperationType === "expense" ? "secondary active-secondary" : "secondary"}
+              type="button"
+              onClick={() => setQuickOperationType((current) => (current === "expense" ? null : "expense"))}
+              disabled={!period}
+            >
+              <Minus size={15} />
               Расход
             </button>
-            <button className="secondary" type="button" onClick={() => setModal({ type: "special_income", character })} disabled={!period}>
+            <button
+              className={quickOperationType === "special_income" ? "secondary active-secondary" : "secondary"}
+              type="button"
+              onClick={() => setQuickOperationType((current) => (current === "special_income" ? null : "special_income"))}
+              disabled={!period}
+            >
               <Plus size={15} />
               Поступление
             </button>
           </div>
         </div>
+        {quickOperationType ? (
+          <InlineOperationForm
+            key={`${character.id}-${quickOperationType}`}
+            character={character}
+            period={period}
+            type={quickOperationType}
+            onCancel={() => setQuickOperationType(null)}
+            onSubmit={async (openPeriod, input) => {
+              await onSaveOperation(character, openPeriod, input);
+              setQuickOperationType(null);
+            }}
+          />
+        ) : null}
         {!period || operations.length === 0 ? (
           <p className="subtitle">В этом периоде пока нет расходов и крупных поступлений.</p>
         ) : (
@@ -1250,6 +1294,120 @@ function SnapshotForm({
   );
 }
 
+function InlineOperationForm({
+  character,
+  period,
+  type,
+  onCancel,
+  onSubmit
+}: {
+  character: CharacterRecord;
+  period: PeriodRecord | null;
+  type: OperationType;
+  onCancel: () => void;
+  onSubmit: (period: PeriodRecord, input: OperationFormInput) => Promise<void>;
+}) {
+  const categories = type === "expense" ? expenseCategories : specialIncomeCategories;
+  const lastSnapshot = period ? getLastSnapshot(period.snapshots) : null;
+  const [currency, setCurrency] = useState<OperationCurrency>("adena");
+  const [amount, setAmount] = useState("");
+  const [category, setCategory] = useState(categories[0]);
+  const [occurredAt, setOccurredAt] = useState(formatInputDateTime());
+  const [comment, setComment] = useState("");
+  const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
+  const occurredDate = parseInputDateTime(occurredAt);
+  const isAfterLastSnapshot = lastSnapshot ? occurredDate.getTime() > lastSnapshot.capturedAt.getTime() : false;
+
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    setError("");
+
+    try {
+      if (!period) {
+        throw new Error("Нет открытого периода.");
+      }
+
+      const input = {
+        type,
+        currency,
+        amount: parsePositiveAmount(amount, "Сумма"),
+        category,
+        comment,
+        occurredAt: parseNotFuture(occurredAt)
+      };
+
+      setSaving(true);
+      await onSubmit(period, input);
+    } catch (caught) {
+      setError(translateFirebaseError(caught));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <form className="inline-operation-form" onSubmit={submit}>
+      <div className="inline-form-head">
+        <div>
+          <h3>{type === "expense" ? "Новый расход" : "Новое поступление"}</h3>
+          <p className="subtitle">{character.nickname}</p>
+        </div>
+        <IconButton title="Скрыть форму" onClick={onCancel}>
+          <X size={16} />
+        </IconButton>
+      </div>
+      <div className="row">
+        <div className="field">
+          <label htmlFor={`quick-operation-currency-${type}`}>Валюта</label>
+          <select id={`quick-operation-currency-${type}`} value={currency} onChange={(event) => setCurrency(event.target.value as OperationCurrency)}>
+            <option value="adena">Адена</option>
+            <option value="l_coin">L-монеты</option>
+          </select>
+        </div>
+        <div className="field">
+          <label htmlFor={`quick-operation-amount-${type}`}>Сумма</label>
+          <AmountInput id={`quick-operation-amount-${type}`} value={amount} onChange={setAmount} />
+        </div>
+        <div className="field grow">
+          <label htmlFor={`quick-operation-category-${type}`}>Категория</label>
+          <select id={`quick-operation-category-${type}`} value={category} onChange={(event) => setCategory(event.target.value)}>
+            {categories.map((item) => (
+              <option key={item} value={item}>
+                {item}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="field">
+          <label htmlFor={`quick-operation-date-${type}`}>Дата и время</label>
+          <input id={`quick-operation-date-${type}`} type="datetime-local" value={occurredAt} onChange={(event) => setOccurredAt(event.target.value)} />
+        </div>
+      </div>
+      <div className="field">
+        <label htmlFor={`quick-operation-comment-${type}`}>Комментарий</label>
+        <input id={`quick-operation-comment-${type}`} type="text" value={comment} onChange={(event) => setComment(event.target.value)} />
+      </div>
+      {type === "special_income" ? (
+        <div className="steps">Поступление уже должно входить в фактический остаток. Эта запись только выделит его из обычного фарма.</div>
+      ) : null}
+      {isAfterLastSnapshot ? (
+        <div className="steps warn">Операция позже последнего замера. Она попадёт в расчёт после обновления остатка.</div>
+      ) : null}
+      <div className="inline-form-actions">
+        <button className="ghost" type="button" onClick={onCancel} disabled={saving}>
+          Отмена
+        </button>
+        <button type="submit" disabled={saving}>
+          <Save size={15} />
+          {saving ? "Сохраняем..." : "Добавить"}
+        </button>
+      </div>
+      <div className="err">{error}</div>
+    </form>
+  );
+}
+
 function OperationForm({
   character,
   period,
@@ -1263,14 +1421,7 @@ function OperationForm({
   type: OperationType;
   operation?: OperationRecord;
   onCancel: () => void;
-  onSubmit: (period: PeriodRecord, input: {
-    type: OperationType;
-    currency: OperationCurrency;
-    amount: number;
-    category: string;
-    comment?: string;
-    occurredAt: Date;
-  }, operationId?: string) => Promise<void>;
+  onSubmit: (period: PeriodRecord, input: OperationFormInput, operationId?: string) => Promise<void>;
 }) {
   const categories = type === "expense" ? expenseCategories : specialIncomeCategories;
   const lastSnapshot = period ? getLastSnapshot(period.snapshots) : null;
