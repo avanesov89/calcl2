@@ -189,11 +189,6 @@ h2 {
   font-size: 15px;
 }
 
-h3 {
-  margin: 0 0 4px;
-  font-size: 14px;
-}
-
 .app {
   max-width: 1180px;
   margin: 0 auto;
@@ -372,16 +367,6 @@ h3 {
   gap: 8px;
   flex-wrap: wrap;
   margin-bottom: 10px;
-}
-
-.inline-operation-title {
-  flex: 0 0 130px;
-  padding-bottom: 6px;
-}
-
-.inline-operation-title span {
-  color: var(--muted);
-  font-size: 12px;
 }
 
 .inline-form-actions {
@@ -723,7 +708,6 @@ tr:hover td {
     flex-direction: column;
   }
 
-  .inline-operation-title,
   .compact-currency,
   .compact-category,
   .compact-comment,

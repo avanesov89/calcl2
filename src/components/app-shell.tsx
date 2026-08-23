@@ -912,7 +912,6 @@ function CharacterDetail({
         {quickOperationType ? (
           <InlineOperationForm
             key={`${character.id}-${quickOperationType}`}
-            character={character}
             period={period}
             type={quickOperationType}
             onCancel={() => setQuickOperationType(null)}
@@ -1295,13 +1294,11 @@ function SnapshotForm({
 }
 
 function InlineOperationForm({
-  character,
   period,
   type,
   onCancel,
   onSubmit
 }: {
-  character: CharacterRecord;
   period: PeriodRecord | null;
   type: OperationType;
   onCancel: () => void;
@@ -1349,10 +1346,6 @@ function InlineOperationForm({
   return (
     <form className="inline-operation-form" onSubmit={submit}>
       <div className="inline-operation-row">
-        <div className="inline-operation-title">
-          <h3>{type === "expense" ? "Новый расход" : "Новое поступление"}</h3>
-          <span>{character.nickname}</span>
-        </div>
         <div className="field compact-currency">
           <label htmlFor={`quick-operation-currency-${type}`}>Валюта</label>
           <select id={`quick-operation-currency-${type}`} value={currency} onChange={(event) => setCurrency(event.target.value as OperationCurrency)}>
