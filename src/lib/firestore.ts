@@ -63,6 +63,8 @@ type OperationInput = {
   occurredAt: Date;
 };
 
+const emptyOperationComment = "__coin_essence_empty_comment__";
+
 export async function ensureUserProfile(user: User): Promise<void> {
   const { db: firestore } = requireFirebase();
   const profileRef = doc(firestore, "users", user.uid);
@@ -365,8 +367,8 @@ export async function saveOperation(
   const operationRef = operationId
     ? doc(firestore, "users", uid, "characters", character.id, "periods", period.id, "operations", operationId)
     : doc(collection(firestore, "users", uid, "characters", character.id, "periods", period.id, "operations"));
-  // Compatibility with older deployed rules that required a non-empty comment for income operations.
-  const comment = input.comment?.trim() || (input.type === "special_income" ? " " : "");
+  // Compatibility with older deployed rules that required a non-empty operation comment.
+  const comment = input.comment?.trim() || emptyOperationComment;
   const payload = {
     type: input.type,
     currency: input.currency,
@@ -624,7 +626,7 @@ function mapOperation(id: string, data: Record<string, unknown>): OperationRecor
     currency: data.currency === "l_coin" ? "l_coin" : keyToOperationCurrency("adena"),
     amount: Number(data.amount ?? 0),
     category: String(data.category ?? ""),
-    comment: optionalString(data.comment),
+    comment: optionalOperationComment(data.comment),
     occurredAt: toDate(data.occurredAt),
     createdAt: toDate(data.createdAt),
     updatedAt: toDate(data.updatedAt)
@@ -642,6 +644,11 @@ function isTheme(value: unknown): value is ThemePreference {
 function optionalString(value: unknown): string | undefined {
   const text = typeof value === "string" ? value.trim() : "";
   return text || undefined;
+}
+
+function optionalOperationComment(value: unknown): string | undefined {
+  const text = optionalString(value);
+  return text === emptyOperationComment ? undefined : text;
 }
 
 function toDate(value: unknown): Date {
