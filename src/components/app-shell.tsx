@@ -62,6 +62,7 @@ import {
   formatInputDateTime,
   formatInteger,
   formatIntervalLabel,
+  formatShortDate,
   formatSignedInteger,
   formatYmdRange,
   operationCurrencyLabels,
@@ -678,20 +679,6 @@ function CharactersListScreen({
           <EmptyState text="Добавьте первого персонажа и укажите его текущие остатки, чтобы начать учёт." />
         ) : (
           <>
-            <div className="bulk-close-bar">
-              <span className="small">
-                Для закрытия выбрано: {selectedCloseCharacters.length} из {closableRows.length}
-              </span>
-              <button
-                className="secondary"
-                type="button"
-                onClick={() => onClosePeriods(selectedCloseCharacters)}
-                disabled={selectedCloseCharacters.length === 0}
-              >
-                <Save size={15} />
-                Закрыть период
-              </button>
-            </div>
             <div className="table-wrap">
               <table>
                 <thead>
@@ -756,10 +743,10 @@ function CharactersListScreen({
                         </td>
                         <td className={`num-cell ${resultClassName(intervalNet)}`}>{lastInterval ? formatSignedInteger(intervalNet) : "—"}</td>
                         <td className={`num-cell ${resultClassName(net)}`}>{summary ? formatSignedInteger(net) : "—"}</td>
-                        <td className="num-cell">{summary ? formatInteger(summary[selectedCurrency].expenses) : "—"}</td>
-                        <td className="num-cell">{summary ? formatInteger(summary[selectedCurrency].specialIncome) : "—"}</td>
+                        <td className="num-cell money-expense">{summary ? formatInteger(summary[selectedCurrency].expenses) : "—"}</td>
+                        <td className="num-cell money-income">{summary ? formatInteger(summary[selectedCurrency].specialIncome) : "—"}</td>
                         <td>
-                          <span className={hasUncounted ? "pill amber" : "date-cell"}>{formatDateTime(character.lastSnapshotAt)}</span>
+                          <span className={hasUncounted ? "pill amber" : "date-cell"}>{formatShortDate(character.lastSnapshotAt)}</span>
                           {hasUncounted ? <div className="small">Есть операции после остатка</div> : null}
                         </td>
                       </tr>
@@ -767,6 +754,20 @@ function CharactersListScreen({
                   })}
                 </tbody>
               </table>
+            </div>
+            <div className="bulk-close-bar">
+              <span className="small">
+                Для закрытия выбрано: {selectedCloseCharacters.length} из {closableRows.length}
+              </span>
+              <button
+                className="secondary"
+                type="button"
+                onClick={() => onClosePeriods(selectedCloseCharacters)}
+                disabled={selectedCloseCharacters.length === 0}
+              >
+                <Save size={15} />
+                Закрыть период
+              </button>
             </div>
           </>
         )}
@@ -1065,7 +1066,9 @@ function CharacterDetail({
                     </td>
                     <td>{operationCurrencyLabels[operation.currency]}</td>
                     <td>{operation.category}</td>
-                    <td className="num-cell">{formatInteger(operation.amount)}</td>
+                    <td className={`num-cell ${operation.type === "expense" ? "money-expense" : "money-income"}`}>
+                      {formatInteger(operation.amount)}
+                    </td>
                     <td>{operation.comment || "—"}</td>
                     <td className="actions-cell">
                       <IconButton title="Редактировать" onClick={() => setModal({ type: operation.type, character, operation })}>
@@ -1207,8 +1210,8 @@ function HistoryScreen({
                         </button>
                         <div className="small history-server">Персонажей: {group.items.length}</div>
                       </td>
-                      <td className="num-cell">{formatInteger(currencySummary.expenses)}</td>
-                      <td className="num-cell">{formatInteger(currencySummary.grossEarned)}</td>
+                      <td className="num-cell money-expense">{formatInteger(currencySummary.expenses)}</td>
+                      <td className="num-cell money-income">{formatInteger(currencySummary.grossEarned)}</td>
                     </tr>
                     {expanded ? (
                       <tr className="history-detail-row">
@@ -1249,9 +1252,9 @@ function HistoryScreen({
                                           </td>
                                           <td className="num-cell">{formatInteger(itemSummary.openingBalance)}</td>
                                           <td className="num-cell">{formatInteger(itemSummary.closingBalance)}</td>
-                                          <td className="num-cell">{formatInteger(itemSummary.grossEarned)}</td>
-                                          <td className="num-cell">{formatInteger(itemSummary.expenses)}</td>
-                                          <td className="num-cell">{formatInteger(itemSummary.specialIncome)}</td>
+                                          <td className="num-cell money-income">{formatInteger(itemSummary.grossEarned)}</td>
+                                          <td className="num-cell money-expense">{formatInteger(itemSummary.expenses)}</td>
+                                          <td className="num-cell money-income">{formatInteger(itemSummary.specialIncome)}</td>
                                           <td className={`num-cell ${resultClassName(itemSummary.netResult)}`}>
                                             {formatSignedInteger(itemSummary.netResult)}
                                             <div className="small">{formatSignedInteger(average)}/день</div>
@@ -1974,9 +1977,9 @@ function ClosePeriodForm({
                         onChange={(value) => updateBalance(character.id, "lCoin", value)}
                       />
                     </td>
-                    <td className="num-cell">{summary ? formatInteger(summary.grossEarned) : "—"}</td>
-                    <td className="num-cell">{summary ? formatInteger(summary.specialIncome) : "—"}</td>
-                    <td className="num-cell">{summary ? formatInteger(summary.expenses) : "—"}</td>
+                    <td className="num-cell money-income">{summary ? formatInteger(summary.grossEarned) : "—"}</td>
+                    <td className="num-cell money-income">{summary ? formatInteger(summary.specialIncome) : "—"}</td>
+                    <td className="num-cell money-expense">{summary ? formatInteger(summary.expenses) : "—"}</td>
                     <td className={`num-cell ${summary ? resultClassName(summary.netResult) : "neutral"}`}>
                       {summary ? formatSignedInteger(summary.netResult) : "—"}
                     </td>
@@ -2135,11 +2138,11 @@ function IntervalsTable({
                   ) : null}
                 </td>
                 <td className="num-cell">{formatInteger(summary.openingBalance)}</td>
-                <td className="num-cell">{formatInteger(summary.expenses)}</td>
-                <td className="num-cell">{formatInteger(summary.specialIncome)}</td>
+                <td className="num-cell money-expense">{formatInteger(summary.expenses)}</td>
+                <td className="num-cell money-income">{formatInteger(summary.specialIncome)}</td>
                 <td className="num-cell">{formatInteger(summary.closingBalance)}</td>
-                <td className="num-cell">{formatInteger(summary.grossEarned)}</td>
-                <td className="num-cell">{formatInteger(summary.regularFarm)}</td>
+                <td className="num-cell money-income">{formatInteger(summary.grossEarned)}</td>
+                <td className="num-cell money-income">{formatInteger(summary.regularFarm)}</td>
                 <td className={`num-cell ${resultClassName(summary.netResult)}`}>{formatSignedInteger(summary.netResult)}</td>
                 <td>
                   <span className={interval.status === "closed" ? "pill green" : "pill amber"}>

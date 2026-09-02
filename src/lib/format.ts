@@ -49,6 +49,14 @@ export function formatDateTime(date: Date): string {
   return formatDate(date);
 }
 
+export function formatShortDate(date: Date): string {
+  return new Intl.DateTimeFormat("ru-RU", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric"
+  }).format(date);
+}
+
 export function formatDate(date: Date): string {
   const parts = new Intl.DateTimeFormat("ru-RU", {
     day: "numeric",

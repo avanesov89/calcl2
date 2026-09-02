@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatDate } from "./format";
+import { formatDate, formatShortDate } from "./format";
 
 describe("date formatting", () => {
   it("shows day and month for the current year", () => {
@@ -12,5 +12,9 @@ describe("date formatting", () => {
     const previousYear = new Date().getFullYear() - 1;
 
     expect(formatDate(new Date(previousYear, 7, 23))).toBe(`23 августа, ${previousYear}`);
+  });
+
+  it("formats short numeric dates", () => {
+    expect(formatShortDate(new Date(2026, 7, 23))).toBe("23.08.2026");
   });
 });
