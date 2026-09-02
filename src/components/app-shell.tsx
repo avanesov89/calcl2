@@ -1217,12 +1217,6 @@ function HistoryScreen({
                       <tr className="history-detail-row">
                         <td colSpan={3}>
                           <div className="history-details" id={`history-details-${group.id}`}>
-                            <div className="history-detail-head">
-                              <div>
-                                <div className="history-detail-title">{formatYmdRange(group.plannedStartDate, group.plannedEndDate)}</div>
-                                <div className="small">Статистика по персонажам в выбранной валюте.</div>
-                              </div>
-                            </div>
                             <div className="table-wrap history-compact-table">
                               <table>
                                 <thead>

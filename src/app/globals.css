@@ -745,18 +745,6 @@ tr:hover td {
   border-top: 1px solid var(--border);
 }
 
-.history-detail-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 10px;
-}
-
-.history-detail-title {
-  color: var(--text);
-  font-weight: 700;
-}
-
 .history-compact-table table {
   font-size: 12.5px;
 }
@@ -853,11 +841,6 @@ tr:hover td {
 
   .stat {
     flex: 1 1 145px;
-  }
-
-  .history-detail-head {
-    align-items: stretch;
-    flex-direction: column;
   }
 
   .bulk-close-bar {
