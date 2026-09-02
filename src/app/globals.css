@@ -8,13 +8,11 @@
   --accent-light: #e8ecfd;
   --green: #1f9d55;
   --green-bg: #e7f8ee;
-  --money-income-bg: #eef8f2;
   --money-income-text: #287a4f;
   --amber: #b7791f;
   --amber-bg: #fdf3df;
   --red: #c0392b;
   --red-bg: #fce9e7;
-  --money-expense-bg: #fbefee;
   --money-expense-text: #a14a44;
   --hover-bg: #fafbfc;
   --btn-text: #ffffff;
@@ -31,13 +29,11 @@
   --accent-light: #232a4a;
   --green: #3ecf7e;
   --green-bg: #123524;
-  --money-income-bg: rgb(62 207 126 / 11%);
   --money-income-text: #8fd9ad;
   --amber: #e6b95c;
   --amber-bg: #3a2c10;
   --red: #f0716d;
   --red-bg: #3a1616;
-  --money-expense-bg: rgb(240 113 109 / 12%);
   --money-expense-text: #e7a09d;
   --hover-bg: #22262f;
   --btn-text: #ffffff;
@@ -542,13 +538,11 @@ tr:hover td {
 }
 
 .money-expense {
-  background: var(--money-expense-bg);
   color: var(--money-expense-text);
   font-weight: 600;
 }
 
 .money-income {
-  background: var(--money-income-bg);
   color: var(--money-income-text);
   font-weight: 600;
 }
