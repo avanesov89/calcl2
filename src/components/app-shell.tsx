@@ -1111,8 +1111,9 @@ function HistoryScreen({
       string,
       {
         id: string;
-        plannedStartDate: string;
-        plannedEndDate: string;
+        actualStart: Date;
+        actualEnd: Date;
+        accountedDays: number;
         sortTime: number;
         items: Array<{ character: CharacterRecord; period: PeriodRecord; summary: PeriodSummary }>;
       }
@@ -1124,11 +1125,14 @@ function HistoryScreen({
           continue;
         }
 
-        const id = `${period.plannedStartDate}_${period.plannedEndDate}`;
+        const actualRange = getPeriodActualRange(period);
+        const summary = period.summary ?? calculatePeriodSummary(period.snapshots, period.operations);
+        const id = getHistoryPeriodGroupId(actualRange.start, actualRange.end, summary.accountedDays);
         const group = groups.get(id) ?? {
           id,
-          plannedStartDate: period.plannedStartDate,
-          plannedEndDate: period.plannedEndDate,
+          actualStart: actualRange.start,
+          actualEnd: actualRange.end,
+          accountedDays: summary.accountedDays,
           sortTime: 0,
           items: []
         };
@@ -1136,8 +1140,9 @@ function HistoryScreen({
         group.items.push({
           character,
           period,
-          summary: period.summary ?? calculatePeriodSummary(period.snapshots, period.operations)
+          summary
         });
+        group.accountedDays = Math.max(group.accountedDays, summary.accountedDays);
         group.sortTime = Math.max(group.sortTime, getPeriodSortTime(period));
         groups.set(id, group);
       }
@@ -1206,9 +1211,11 @@ function HistoryScreen({
                           onClick={() => toggleExpanded(group.id)}
                         >
                           {expanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-                          <span>{formatYmdRange(group.plannedStartDate, group.plannedEndDate)}</span>
+                          <span>{formatHistoryPeriodLabel(group.actualStart, group.actualEnd, group.accountedDays)}</span>
                         </button>
-                        <div className="small history-server">Персонажей: {group.items.length}</div>
+                        <div className="small history-server">
+                          Персонажей: {group.items.length}; учтено: {formatDaysLabel(group.accountedDays)}
+                        </div>
                       </td>
                       <td className="num-cell money-expense">{formatInteger(currencySummary.expenses)}</td>
                       <td className="num-cell money-income">{formatInteger(currencySummary.grossEarned)}</td>
@@ -2372,6 +2379,54 @@ function normalizeAmountInput(value: string): string {
 function formatAmountInput(value: string): string {
   const normalized = normalizeAmountInput(value);
   return normalized.replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+}
+
+function getPeriodActualRange(period: PeriodRecord): { start: Date; end: Date } {
+  const snapshots = sortSnapshots(period.snapshots);
+  return {
+    start: snapshots[0]?.capturedAt ?? period.openedAt,
+    end: snapshots[snapshots.length - 1]?.capturedAt ?? period.closedAt ?? period.openedAt
+  };
+}
+
+function getHistoryPeriodGroupId(start: Date, end: Date, accountedDays: number): string {
+  if (accountedDays <= 1) {
+    return `${getLocalDateKey(start)}_1`;
+  }
+
+  return `${getLocalDateKey(start)}_${getLocalDateKey(end)}_${accountedDays}`;
+}
+
+function formatHistoryPeriodLabel(start: Date, end: Date, accountedDays: number): string {
+  if (accountedDays <= 1) {
+    return formatDateTime(start);
+  }
+
+  return formatIntervalLabel(start, end);
+}
+
+function formatDaysLabel(days: number): string {
+  const absDays = Math.abs(days);
+  const lastDigit = absDays % 10;
+  const lastTwoDigits = absDays % 100;
+
+  if (lastDigit === 1 && lastTwoDigits !== 11) {
+    return `${days} день`;
+  }
+
+  if (lastDigit >= 2 && lastDigit <= 4 && (lastTwoDigits < 12 || lastTwoDigits > 14)) {
+    return `${days} дня`;
+  }
+
+  return `${days} дней`;
+}
+
+function getLocalDateKey(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
 }
 
 function getPeriodSortTime(period: PeriodRecord): number {
