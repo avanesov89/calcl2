@@ -653,7 +653,6 @@ function CharactersListScreen({
         <div className="card-head">
           <div>
             <h2>Персонажи</h2>
-            <span className="small">Выберите персонажа, чтобы открыть его обзор и операции. Валюта таблицы: {currencyLabels[selectedCurrency]}.</span>
           </div>
           <div className="button-row section-actions">
             <button

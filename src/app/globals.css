@@ -264,13 +264,14 @@ h2 {
 .card-head,
 .modal-head {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 10px;
   flex-wrap: wrap;
   margin-bottom: 12px;
 }
 
+.card-head h2,
 .modal-head h2 {
   margin-bottom: 0;
 }
