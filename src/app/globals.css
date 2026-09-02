@@ -712,7 +712,9 @@ tr:hover td {
 }
 
 .accordion-trigger {
+  align-items: center;
   justify-content: flex-start;
+  gap: 8px;
   padding: 0;
   background: transparent;
   color: var(--text);
@@ -725,8 +727,9 @@ tr:hover td {
   filter: none;
 }
 
-.history-server {
-  margin-left: 22px;
+.accordion-content {
+  display: grid;
+  gap: 2px;
 }
 
 .history-main-row td {
@@ -752,6 +755,12 @@ tr:hover td {
 .history-compact-table th,
 .history-compact-table td {
   padding: 6px 7px;
+}
+
+.history-detail-btn {
+  display: flex;
+  width: fit-content;
+  margin-top: 5px;
 }
 
 .modal-backdrop {

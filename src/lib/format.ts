@@ -119,7 +119,7 @@ export function resultClassName(value: number): "positive" | "negative" | "neutr
 export function summarizeCurrency(summary: CurrencySummary): string {
   return `Заработано ${formatInteger(summary.grossEarned)}, из них ${formatInteger(
     summary.specialIncome
-  )} - крупные поступления. Обычный фарм - ${formatInteger(summary.regularFarm)}. Расходы - ${formatInteger(
+  )} - поступления. Обычный фарм - ${formatInteger(summary.regularFarm)}. Расходы - ${formatInteger(
     summary.expenses
   )}. Чистый результат - ${formatSignedInteger(summary.netResult)}.`;
 }

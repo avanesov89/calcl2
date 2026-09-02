@@ -708,7 +708,7 @@ function CharactersListScreen({
                       Расходы недели
                     </SortableTh>
                     <SortableTh active={sortKey === "specialIncome"} direction={sortDirection} onClick={() => toggleSort("specialIncome")} alignRight>
-                      Крупные поступления
+                      Поступления
                     </SortableTh>
                     <SortableTh active={sortKey === "lastSnapshotAt"} direction={sortDirection} onClick={() => toggleSort("lastSnapshotAt")}>
                       Последний остаток
@@ -1211,11 +1211,13 @@ function HistoryScreen({
                           onClick={() => toggleExpanded(group.id)}
                         >
                           {expanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-                          <span>{formatHistoryPeriodLabel(group.actualStart, group.actualEnd, group.accountedDays)}</span>
+                          <span className="accordion-content">
+                            <span>{formatHistoryPeriodLabel(group.actualStart, group.actualEnd, group.accountedDays)}</span>
+                            <span className="small">
+                              Персонажей: {group.items.length}; учтено: {formatDaysLabel(group.accountedDays)}
+                            </span>
+                          </span>
                         </button>
-                        <div className="small history-server">
-                          Персонажей: {group.items.length}; учтено: {formatDaysLabel(group.accountedDays)}
-                        </div>
                       </td>
                       <td className="num-cell money-expense">{formatInteger(currencySummary.expenses)}</td>
                       <td className="num-cell money-income">{formatInteger(currencySummary.grossEarned)}</td>
@@ -1235,7 +1237,6 @@ function HistoryScreen({
                                     <th className="right">Расход</th>
                                     <th className="right">Поступления</th>
                                     <th className="right">Результат</th>
-                                    <th>Детали</th>
                                   </tr>
                                 </thead>
                                 <tbody>
@@ -1250,6 +1251,9 @@ function HistoryScreen({
                                           <td>
                                             <b>{character.nickname}</b>
                                             {character.server ? <div className="small">{character.server}</div> : null}
+                                            <button className="copy-btn history-detail-btn" type="button" onClick={() => setModal({ type: "period", character, period })}>
+                                              Детали
+                                            </button>
                                           </td>
                                           <td className="num-cell">{formatInteger(itemSummary.openingBalance)}</td>
                                           <td className="num-cell">{formatInteger(itemSummary.closingBalance)}</td>
@@ -1259,11 +1263,6 @@ function HistoryScreen({
                                           <td className={`num-cell ${resultClassName(itemSummary.netResult)}`}>
                                             {formatSignedInteger(itemSummary.netResult)}
                                             <div className="small">{formatSignedInteger(average)}/день</div>
-                                          </td>
-                                          <td>
-                                            <button className="copy-btn" type="button" onClick={() => setModal({ type: "period", character, period })}>
-                                              Открыть
-                                            </button>
                                           </td>
                                         </tr>
                                       );
@@ -1744,7 +1743,7 @@ function OperationForm({
   return (
     <form onSubmit={submit}>
       <ModalHead
-        title={`${operation ? "Редактировать" : "Добавить"} ${type === "expense" ? "расход" : "крупное поступление"} · ${character.nickname}`}
+        title={`${operation ? "Редактировать" : "Добавить"} ${type === "expense" ? "расход" : "поступление"} · ${character.nickname}`}
         onCancel={onCancel}
       />
       <div className="row">
@@ -2082,7 +2081,7 @@ function SummaryStats({
       <Stat label="Текущий остаток" value={formatCompact(balances[selectedCurrency])} title={formatInteger(balances[selectedCurrency])} />
       <Stat label="Общий заработок" value={formatCompact(currencySummary.grossEarned)} title={formatInteger(currencySummary.grossEarned)} />
       <Stat label="Обычный фарм" value={formatCompact(currencySummary.regularFarm)} title={formatInteger(currencySummary.regularFarm)} />
-      <Stat label="Крупные поступления" value={formatCompact(currencySummary.specialIncome)} title={formatInteger(currencySummary.specialIncome)} />
+      <Stat label="Поступления" value={formatCompact(currencySummary.specialIncome)} title={formatInteger(currencySummary.specialIncome)} />
       <Stat label="Расходы" value={formatCompact(currencySummary.expenses)} title={formatInteger(currencySummary.expenses)} />
       <Stat
         label="Чистый результат"
@@ -2117,7 +2116,7 @@ function IntervalsTable({
             <th>Промежуток</th>
             <th className="right">Было</th>
             <th className="right">Расходы</th>
-            <th className="right">Крупные поступления</th>
+            <th className="right">Поступления</th>
             <th className="right">Стало</th>
             <th className="right">Заработано</th>
             <th className="right">Обычный фарм</th>

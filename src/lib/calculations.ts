@@ -92,7 +92,7 @@ export function calculateCurrencySummary(
   const openingBalance = assertNonNegativeInteger(startBalance, "Начальный остаток");
   const closingBalance = assertNonNegativeInteger(endBalance, "Конечный остаток");
   const safeExpenses = assertNonNegativeInteger(expenses, "Расходы");
-  const safeSpecialIncome = assertNonNegativeInteger(specialIncome, "Крупные поступления");
+  const safeSpecialIncome = assertNonNegativeInteger(specialIncome, "Поступления");
   const grossEarned = closingBalance - openingBalance + safeExpenses;
   const regularFarm = grossEarned - safeSpecialIncome;
   const netResult = closingBalance - openingBalance;
