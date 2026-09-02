@@ -2,6 +2,8 @@
 
 import {
   Archive,
+  ChevronDown,
+  ChevronRight,
   DoorOpen,
   Minus,
   MoreHorizontal,
@@ -14,7 +16,7 @@ import {
   X
 } from "lucide-react";
 import { User, createUserWithEmailAndPassword, onAuthStateChanged, sendPasswordResetEmail, signInWithEmailAndPassword, signOut } from "firebase/auth";
-import { FormEvent, ReactNode, useCallback, useEffect, useMemo, useState } from "react";
+import { Fragment, FormEvent, ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 import {
   buildIntervals,
   calculateInterval,
@@ -77,7 +79,7 @@ type ModalState =
   | { type: "snapshot"; character: CharacterRecord; snapshot?: SnapshotRecord }
   | { type: "expense"; character: CharacterRecord; operation?: OperationRecord }
   | { type: "special_income"; character: CharacterRecord; operation?: OperationRecord }
-  | { type: "close"; character: CharacterRecord }
+  | { type: "close"; characters: CharacterRecord[] }
   | { type: "period"; character: CharacterRecord; period: PeriodRecord }
   | null;
 
@@ -97,8 +99,14 @@ type CharacterFormInput = {
   capturedAt: Date;
 };
 
-const expenseCategories = ["руда", "заряды души", "банки/расходники", "телепорты", "экипировка", "комиссия", "другое"];
-const specialIncomeCategories = ["продажа крупного дропа", "продажа предмета", "награда", "другое"];
+type ClosePeriodSubmitItem = {
+  character: CharacterRecord;
+  period: PeriodRecord;
+  input: { balances: { adena: number; lCoin: number }; capturedAt: Date; comment?: string };
+};
+
+const expenseCategories = ["Расходки", "Синтезы"];
+const specialIncomeCategories = ["Дроп", "Продажа", "Другое"];
 
 export default function AppShell() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -272,6 +280,7 @@ export default function AppShell() {
             setSelectedCharacterId(character.id);
             setTab("overview");
           }}
+          onClosePeriods={(selectedCharacters) => setModal({ type: "close", characters: selectedCharacters })}
           onCreateCharacter={handleCreateCharacter}
         />
       ) : null}
@@ -375,13 +384,16 @@ export default function AppShell() {
 
           {modal.type === "close" ? (
             <ClosePeriodForm
-              character={modal.character}
-              period={getOpenPeriod(modal.character)}
+              characters={modal.characters}
               selectedCurrency={selectedCurrency}
               onCancel={() => setModal(null)}
-              onSubmit={async (period, input) => {
-                await closePeriod(currentUser.uid, modal.character, period, input);
-                await reloadWithNotice("Неделя завершена, следующая начата автоматически.");
+              onSubmit={async (items) => {
+                await Promise.all(items.map((item) => closePeriod(currentUser.uid, item.character, item.period, item.input)));
+                await reloadWithNotice(
+                  items.length === 1
+                    ? "Период завершён, следующий начат автоматически."
+                    : `Период завершён для ${items.length} персонажей.`
+                );
                 setModal(null);
               }}
             />
@@ -527,6 +539,7 @@ function CharactersListScreen({
   setSelectedCurrency,
   timezone,
   onOpenCharacter,
+  onClosePeriods,
   onCreateCharacter
 }: {
   characters: CharacterRecord[];
@@ -534,11 +547,13 @@ function CharactersListScreen({
   setSelectedCurrency: (currency: Currency) => void;
   timezone: string;
   onOpenCharacter: (character: CharacterRecord) => void;
+  onClosePeriods: (characters: CharacterRecord[]) => void;
   onCreateCharacter: (input: CharacterFormInput) => Promise<void>;
 }) {
   const [sortKey, setSortKey] = useState<SortKey>("nickname");
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
   const [isCharacterFormOpen, setIsCharacterFormOpen] = useState(false);
+  const [selectedCloseIds, setSelectedCloseIds] = useState<string[]>([]);
   const totals = useMemo(() => {
     const balances = { adena: 0, lCoin: 0 };
     const summaries: PeriodSummary[] = [];
@@ -597,6 +612,11 @@ function CharactersListScreen({
       return (Number(leftValue) - Number(rightValue)) * direction;
     });
   }, [characters, selectedCurrency, sortDirection, sortKey, timezone]);
+  const closableRows = rows.filter(({ period }) => Boolean(period));
+  const selectedCloseCharacters = rows
+    .filter(({ character, period }) => Boolean(period) && selectedCloseIds.includes(character.id))
+    .map(({ character }) => character);
+  const allClosableSelected = closableRows.length > 0 && closableRows.every(({ character }) => selectedCloseIds.includes(character.id));
 
   function toggleSort(key: SortKey) {
     if (sortKey === key) {
@@ -606,6 +626,14 @@ function CharactersListScreen({
 
     setSortKey(key);
     setSortDirection("asc");
+  }
+
+  function toggleCloseSelection(characterId: string) {
+    setSelectedCloseIds((ids) => (ids.includes(characterId) ? ids.filter((id) => id !== characterId) : [...ids, characterId]));
+  }
+
+  function toggleAllCloseSelection() {
+    setSelectedCloseIds(allClosableSelected ? [] : closableRows.map(({ character }) => character.id));
   }
 
   return (
@@ -628,6 +656,15 @@ function CharactersListScreen({
             <span className="small">Выберите персонажа, чтобы открыть его обзор и операции. Валюта таблицы: {currencyLabels[selectedCurrency]}.</span>
           </div>
           <div className="button-row section-actions">
+            <button
+              className="secondary"
+              type="button"
+              onClick={() => onClosePeriods(selectedCloseCharacters)}
+              disabled={selectedCloseCharacters.length === 0}
+            >
+              <Save size={15} />
+              Закрыть период
+            </button>
             <button
               className={isCharacterFormOpen ? "secondary active-secondary" : "secondary"}
               type="button"
@@ -654,6 +691,15 @@ function CharactersListScreen({
             <table>
               <thead>
                 <tr>
+                  <th className="select-cell">
+                    <input
+                      type="checkbox"
+                      aria-label="Выбрать всех для закрытия периода"
+                      checked={allClosableSelected}
+                      disabled={closableRows.length === 0}
+                      onChange={toggleAllCloseSelection}
+                    />
+                  </th>
                   <SortableTh active={sortKey === "nickname"} direction={sortDirection} onClick={() => toggleSort("nickname")}>
                     Персонаж
                   </SortableTh>
@@ -685,6 +731,15 @@ function CharactersListScreen({
 
                   return (
                     <tr key={character.id}>
+                      <td className="select-cell">
+                        <input
+                          type="checkbox"
+                          aria-label={`Выбрать ${character.nickname} для закрытия периода`}
+                          checked={selectedCloseIds.includes(character.id)}
+                          disabled={!period}
+                          onChange={() => toggleCloseSelection(character.id)}
+                        />
+                      </td>
                       <td>
                         <button className="link-btn" type="button" onClick={() => onOpenCharacter(character)}>
                           {character.nickname}
@@ -847,19 +902,6 @@ function CharacterDetail({
                 >
                   <Archive size={15} />
                   {character.status === "archived" ? "Вернуть из архива" : "Архивировать"}
-                </button>
-                <button
-                  className="menu-item"
-                  type="button"
-                  role="menuitem"
-                  disabled={!period}
-                  onClick={() => {
-                    setIsCharacterMenuOpen(false);
-                    setModal({ type: "close", character });
-                  }}
-                >
-                  <Save size={15} />
-                  Завершить неделю
                 </button>
                 <button
                   className="menu-item danger"
@@ -1037,6 +1079,7 @@ function HistoryScreen({
   setModal: (modal: ModalState) => void;
 }) {
   const [characterFilter, setCharacterFilter] = useState("all");
+  const [expandedRows, setExpandedRows] = useState<string[]>([]);
   const filteredCharacters = characterFilter === "all" ? characters : characters.filter((character) => character.id === characterFilter);
   const periods = filteredCharacters
     .flatMap((character) =>
@@ -1045,6 +1088,10 @@ function HistoryScreen({
         .map((period) => ({ character, period, summary: period.summary ?? calculatePeriodSummary(period.snapshots, period.operations) }))
     )
     .sort((left, right) => getPeriodSortTime(right.period) - getPeriodSortTime(left.period));
+
+  function toggleExpanded(rowId: string) {
+    setExpandedRows((current) => (current.includes(rowId) ? current.filter((id) => id !== rowId) : [...current, rowId]));
+  }
 
   return (
     <section className="card">
@@ -1075,50 +1122,120 @@ function HistoryScreen({
           <table>
             <thead>
               <tr>
-                <th>Персонаж</th>
-                <th>Даты</th>
-                <th className="right">Дней</th>
-                <th className="right">Было</th>
-                <th className="right">Стало</th>
-                <th className="right">Заработано</th>
-                <th className="right">Крупные</th>
-                <th className="right">Обычный фарм</th>
-                <th className="right">Расходы</th>
+                <th>Ник</th>
+                <th>Дата</th>
                 <th className="right">Результат</th>
-                <th>Детали</th>
               </tr>
             </thead>
             <tbody>
               {periods.map(({ character, period, summary }) => {
+                const rowId = `${character.id}-${period.id}`;
                 const currencySummary = summary[selectedCurrency];
-                const average = summary.accountedDays ? Math.round(currencySummary.netResult / summary.accountedDays) : 0;
+                const expanded = expandedRows.includes(rowId);
+                const expenses = sortOperations(period.operations.filter((operation) => operation.type === "expense"));
+                const income = sortOperations(period.operations.filter((operation) => operation.type === "special_income"));
 
                 return (
-                  <tr key={`${character.id}-${period.id}`}>
-                    <td>{character.nickname}</td>
-                    <td>
-                      {formatYmdRange(period.plannedStartDate, period.plannedEndDate)}
-                      {period.closedAt ? <div className="small">Завершена {formatDateTime(period.closedAt)}</div> : null}
-                    </td>
-                    <td className="num-cell">{summary.accountedDays}</td>
-                    <td className="num-cell">{formatInteger(currencySummary.openingBalance)}</td>
-                    <td className="num-cell">{formatInteger(currencySummary.closingBalance)}</td>
-                    <td className="num-cell">{formatInteger(currencySummary.grossEarned)}</td>
-                    <td className="num-cell">{formatInteger(currencySummary.specialIncome)}</td>
-                    <td className="num-cell">{formatInteger(currencySummary.regularFarm)}</td>
-                    <td className="num-cell">{formatInteger(currencySummary.expenses)}</td>
-                    <td className={`num-cell ${resultClassName(currencySummary.netResult)}`}>
-                      {formatSignedInteger(currencySummary.netResult)}
-                      <div className="small">ср. {formatSignedInteger(average)}/день</div>
-                    </td>
-                    <td>
-                      <button className="copy-btn" type="button" onClick={() => setModal({ type: "period", character, period })}>
-                        Открыть
-                      </button>
-                    </td>
-                  </tr>
+                  <Fragment key={rowId}>
+                    <tr className="history-main-row">
+                      <td>
+                        <button
+                          className="accordion-trigger"
+                          type="button"
+                          aria-expanded={expanded}
+                          aria-controls={`history-details-${rowId}`}
+                          onClick={() => toggleExpanded(rowId)}
+                        >
+                          {expanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                          <span>{character.nickname}</span>
+                        </button>
+                        {character.server ? <div className="small history-server">{character.server}</div> : null}
+                      </td>
+                      <td>{formatYmdRange(period.plannedStartDate, period.plannedEndDate)}</td>
+                      <td className={`num-cell ${resultClassName(currencySummary.netResult)}`}>
+                        {formatSignedInteger(currencySummary.netResult)}
+                      </td>
+                    </tr>
+                    {expanded ? (
+                      <tr className="history-detail-row">
+                        <td colSpan={3}>
+                          <div className="history-details" id={`history-details-${rowId}`}>
+                            <div className="history-detail-head">
+                              <div>
+                                <div className="history-detail-title">{character.nickname}</div>
+                                <div className="small">
+                                  {formatYmdRange(period.plannedStartDate, period.plannedEndDate)}
+                                  {period.closedAt ? ` · закрыто ${formatDateTime(period.closedAt)}` : ""}
+                                </div>
+                              </div>
+                              <button className="copy-btn" type="button" onClick={() => setModal({ type: "period", character, period })}>
+                                Открыть расчёт
+                              </button>
+                            </div>
+                            <SummaryStats
+                              balances={{ adena: summary.adena.closingBalance, lCoin: summary.lCoin.closingBalance }}
+                              summary={summary}
+                              selectedCurrency={selectedCurrency}
+                              includeAverage
+                            />
+                            <div className="history-operation-grid">
+                              <HistoryOperationBlock title="Расходы" operations={expenses} tone="expense" />
+                              <HistoryOperationBlock title="Доходы" operations={income} tone="income" />
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    ) : null}
+                  </Fragment>
                 );
               })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
+  );
+}
+
+function HistoryOperationBlock({
+  title,
+  operations,
+  tone
+}: {
+  title: string;
+  operations: OperationRecord[];
+  tone: "expense" | "income";
+}) {
+  return (
+    <section className={`operation-block ${tone}`}>
+      <div className="operation-block-title">
+        <span>{title}</span>
+        <span className="small">{operations.length}</span>
+      </div>
+      {operations.length === 0 ? (
+        <p className="subtitle">Операций нет.</p>
+      ) : (
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Дата</th>
+                <th>Валюта</th>
+                <th>Категория</th>
+                <th className="right">Сумма</th>
+                <th>Комментарий</th>
+              </tr>
+            </thead>
+            <tbody>
+              {operations.map((operation) => (
+                <tr key={operation.id}>
+                  <td className="date-cell">{formatDateTime(operation.occurredAt)}</td>
+                  <td>{operationCurrencyLabels[operation.currency]}</td>
+                  <td>{operation.category}</td>
+                  <td className="num-cell">{formatInteger(operation.amount)}</td>
+                  <td>{operation.comment || "—"}</td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
@@ -1634,74 +1751,129 @@ function OperationForm({
 }
 
 function ClosePeriodForm({
-  character,
-  period,
+  characters,
   selectedCurrency,
   onCancel,
   onSubmit
 }: {
-  character: CharacterRecord;
-  period: PeriodRecord | null;
+  characters: CharacterRecord[];
   selectedCurrency: Currency;
   onCancel: () => void;
-  onSubmit: (period: PeriodRecord, input: { balances: { adena: number; lCoin: number }; capturedAt: Date; comment?: string }) => Promise<void>;
+  onSubmit: (items: ClosePeriodSubmitItem[]) => Promise<void>;
 }) {
-  const [adena, setAdena] = useState(amountToInputValue(character.currentBalances.adena));
-  const [lCoin, setLCoin] = useState(amountToInputValue(character.currentBalances.lCoin));
+  const rows = useMemo(
+    () =>
+      characters
+        .map((character) => ({ character, period: getOpenPeriod(character) }))
+        .filter((item): item is { character: CharacterRecord; period: PeriodRecord } => Boolean(item.period)),
+    [characters]
+  );
+  const [balances, setBalances] = useState<Record<string, { adena: string; lCoin: string }>>(() =>
+    Object.fromEntries(
+      rows.map(({ character }) => [
+        character.id,
+        {
+          adena: amountToInputValue(character.currentBalances.adena),
+          lCoin: amountToInputValue(character.currentBalances.lCoin)
+        }
+      ])
+    )
+  );
   const [capturedAt, setCapturedAt] = useState(formatInputDateTime());
   const [comment, setComment] = useState("Завершение недели");
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
-  const lastSnapshot = period ? getLastSnapshot(period.snapshots) : null;
-  const closingSnapshot = useMemo<SnapshotRecord | null>(() => {
-    if (!period) {
-      return null;
-    }
+  const previewRows = useMemo(() => {
+    const capturedDate = parseInputDateTime(capturedAt);
 
-    try {
-      return {
-        id: "closing-preview",
-        kind: "closing",
-        balances: {
-          adena: parseNonNegativeAmount(adena, "Адена"),
-          lCoin: parseNonNegativeAmount(lCoin, "L-монеты")
-        },
-        capturedAt: parseInputDateTime(capturedAt),
-        comment,
-        createdAt: new Date(),
-        updatedAt: new Date()
-      };
-    } catch {
-      return null;
-    }
-  }, [adena, capturedAt, comment, lCoin, period]);
-  const preview = period && closingSnapshot ? calculatePeriodSummary([...period.snapshots, closingSnapshot], period.operations) : null;
-  const durationWarning = preview && Math.abs(preview.actualDurationHours - 168) > 24;
+    return rows
+      .map(({ character, period }) => {
+        const balance = balances[character.id];
+
+        if (!balance) {
+          return null;
+        }
+
+        try {
+          const closingSnapshot: SnapshotRecord = {
+            id: "closing-preview",
+            kind: "closing",
+            balances: {
+              adena: parseNonNegativeAmount(balance.adena, `${character.nickname}: адена`),
+              lCoin: parseNonNegativeAmount(balance.lCoin, `${character.nickname}: L-монеты`)
+            },
+            capturedAt: capturedDate,
+            comment,
+            createdAt: new Date(),
+            updatedAt: new Date()
+          };
+          const summary = calculatePeriodSummary([...period.snapshots, closingSnapshot], period.operations);
+
+          return { character, period, closingSnapshot, summary };
+        } catch {
+          return null;
+        }
+      })
+      .filter((item): item is { character: CharacterRecord; period: PeriodRecord; closingSnapshot: SnapshotRecord; summary: PeriodSummary } =>
+        Boolean(item)
+      );
+  }, [balances, capturedAt, comment, rows]);
+  const aggregateSummary = previewRows.length > 0 ? sumCurrencySummaries(previewRows.map((row) => row.summary)) : null;
+  const aggregateBalances = previewRows.reduce(
+    (total, row) => ({
+      adena: total.adena + row.closingSnapshot.balances.adena,
+      lCoin: total.lCoin + row.closingSnapshot.balances.lCoin
+    }),
+    { adena: 0, lCoin: 0 }
+  );
+
+  function updateBalance(characterId: string, currency: Currency, value: string) {
+    setBalances((current) => ({
+      ...current,
+      [characterId]: {
+        adena: current[characterId]?.adena ?? "",
+        lCoin: current[characterId]?.lCoin ?? "",
+        [currency]: value
+      }
+    }));
+  }
 
   async function submit(event: FormEvent) {
     event.preventDefault();
     setError("");
 
     try {
-      if (!period) {
-        throw new Error("Нет текущей недели.");
+      if (rows.length === 0) {
+        throw new Error("Нет выбранных персонажей с открытым периодом.");
       }
 
-      const input = {
-        balances: {
-          adena: parseNonNegativeAmount(adena, "Адена"),
-          lCoin: parseNonNegativeAmount(lCoin, "L-монеты")
-        },
-        capturedAt: parseNotFuture(capturedAt),
-        comment
-      };
+      const capturedDate = parseNotFuture(capturedAt);
+      const items = rows.map(({ character, period }) => {
+        const balance = balances[character.id];
 
-      if (lastSnapshot && input.capturedAt.getTime() < lastSnapshot.capturedAt.getTime()) {
-        throw new Error("Итоговый остаток не может быть раньше последнего остатка.");
-      }
+        if (!balance) {
+          throw new Error(`Не заполнены остатки для ${character.nickname}.`);
+        }
+
+        const input = {
+          balances: {
+            adena: parseNonNegativeAmount(balance.adena, `${character.nickname}: адена`),
+            lCoin: parseNonNegativeAmount(balance.lCoin, `${character.nickname}: L-монеты`)
+          },
+          capturedAt: capturedDate,
+          comment
+        };
+        const lastSnapshot = getLastSnapshot(period.snapshots);
+
+        if (lastSnapshot && input.capturedAt.getTime() < lastSnapshot.capturedAt.getTime()) {
+          throw new Error(`${character.nickname}: итоговый остаток не может быть раньше последнего остатка.`);
+        }
+
+        return { character, period, input };
+      });
 
       setSaving(true);
-      await onSubmit(period, input);
+      await onSubmit(items);
     } catch (caught) {
       setError(translateFirebaseError(caught));
     } finally {
@@ -1711,16 +1883,8 @@ function ClosePeriodForm({
 
   return (
     <form onSubmit={submit}>
-      <ModalHead title={`Завершить неделю · ${character.nickname}`} onCancel={onCancel} />
+      <ModalHead title="Закрыть период" onCancel={onCancel} />
       <div className="row">
-        <div className="field">
-          <label htmlFor="close-adena">Остаток адены</label>
-          <AmountInput id="close-adena" value={adena} onChange={setAdena} />
-        </div>
-        <div className="field">
-          <label htmlFor="close-lcoin">Остаток L-монет</label>
-          <AmountInput id="close-lcoin" value={lCoin} onChange={setLCoin} />
-        </div>
         <div className="field">
           <label htmlFor="close-date">Дата и время</label>
           <input id="close-date" type="datetime-local" value={capturedAt} onChange={(event) => setCapturedAt(event.target.value)} />
@@ -1730,23 +1894,74 @@ function ClosePeriodForm({
         <label htmlFor="close-comment">Комментарий</label>
         <textarea id="close-comment" value={comment} onChange={(event) => setComment(event.target.value)} />
       </div>
-      {preview ? (
+
+      {rows.length === 0 ? (
+        <EmptyState text="У выбранных персонажей нет открытого периода для закрытия." />
+      ) : (
+        <div className="table-wrap close-period-table">
+          <table>
+            <thead>
+              <tr>
+                <th>Ник</th>
+                <th className="right">Адена</th>
+                <th className="right">L-монеты</th>
+                <th className="right">Заработано</th>
+                <th className="right">Поступления</th>
+                <th className="right">Расходы</th>
+                <th className="right">Результат</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map(({ character }) => {
+                const preview = previewRows.find((row) => row.character.id === character.id);
+                const summary = preview?.summary[selectedCurrency];
+
+                return (
+                  <tr key={character.id}>
+                    <td>
+                      <b>{character.nickname}</b>
+                      {character.server ? <div className="small">{character.server}</div> : null}
+                    </td>
+                    <td className="num-cell">
+                      <AmountInput
+                        id={`close-adena-${character.id}`}
+                        value={balances[character.id]?.adena ?? ""}
+                        onChange={(value) => updateBalance(character.id, "adena", value)}
+                      />
+                    </td>
+                    <td className="num-cell">
+                      <AmountInput
+                        id={`close-lcoin-${character.id}`}
+                        value={balances[character.id]?.lCoin ?? ""}
+                        onChange={(value) => updateBalance(character.id, "lCoin", value)}
+                      />
+                    </td>
+                    <td className="num-cell">{summary ? formatInteger(summary.grossEarned) : "—"}</td>
+                    <td className="num-cell">{summary ? formatInteger(summary.specialIncome) : "—"}</td>
+                    <td className="num-cell">{summary ? formatInteger(summary.expenses) : "—"}</td>
+                    <td className={`num-cell ${summary ? resultClassName(summary.netResult) : "neutral"}`}>
+                      {summary ? formatSignedInteger(summary.netResult) : "—"}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {aggregateSummary ? (
         <div className="preview-block">
-          <div className="title">Итог перед закрытием</div>
-          <p>{summarizeCurrency(preview[selectedCurrency])}</p>
+          <div className="title">Общий итог перед закрытием</div>
+          <SummaryStats balances={aggregateBalances} summary={aggregateSummary} selectedCurrency={selectedCurrency} includeAverage />
+          <p>{summarizeCurrency(aggregateSummary[selectedCurrency])}</p>
           <p className="small">
-            Учтено дней: {preview.accountedDays}; средний результат:{" "}
-            {formatSignedInteger(preview.accountedDays ? Math.round(preview[selectedCurrency].netResult / preview.accountedDays) : 0)}
+            Выбрано персонажей: {previewRows.length}; учтено дней суммарно: {aggregateSummary.accountedDays}.
           </p>
-          {durationWarning ? (
-            <div className="steps warn">
-              Неделя длится {preview.accountedDays} дн. Сравнивать её с обычной неделей следует с осторожностью.
-            </div>
-          ) : null}
         </div>
       ) : null}
       <div className="err">{error}</div>
-      <FormActions onCancel={onCancel} saving={saving} submitLabel="Завершить неделю" />
+      <FormActions onCancel={onCancel} saving={saving} submitLabel="Закрыть выбранные" />
     </form>
   );
 }

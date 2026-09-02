@@ -507,10 +507,10 @@ td {
 th {
   color: var(--muted);
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 300;
   text-align: left;
   text-transform: uppercase;
-  letter-spacing: .02em;
+  letter-spacing: 0;
 }
 
 th.sortable {
@@ -529,6 +529,23 @@ tr:hover td {
 .right,
 .num-cell {
   text-align: right;
+}
+
+.select-cell {
+  width: 34px;
+  text-align: center;
+}
+
+.select-cell input {
+  width: 16px;
+  height: 16px;
+  min-width: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.select-cell input:disabled {
+  cursor: not-allowed;
 }
 
 .date-cell {
@@ -655,6 +672,86 @@ tr:hover td {
   margin-bottom: 0;
 }
 
+.close-period-table {
+  margin: 12px 0;
+}
+
+.close-period-table .amount-input {
+  width: 142px;
+  min-width: 0;
+  text-align: right;
+}
+
+.accordion-trigger {
+  justify-content: flex-start;
+  padding: 0;
+  background: transparent;
+  color: var(--text);
+  font-weight: 600;
+  text-align: left;
+}
+
+.accordion-trigger:hover:not(:disabled) {
+  color: var(--accent);
+  filter: none;
+}
+
+.history-server {
+  margin-left: 22px;
+}
+
+.history-main-row td {
+  vertical-align: middle;
+}
+
+.history-detail-row td {
+  padding: 0 8px 14px;
+  background: var(--hover-bg);
+}
+
+.history-details {
+  display: grid;
+  gap: 14px;
+  padding: 14px;
+  border-top: 1px solid var(--border);
+}
+
+.history-detail-head,
+.operation-block-title {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.history-detail-title,
+.operation-block-title span:first-child {
+  color: var(--text);
+  font-weight: 700;
+}
+
+.history-operation-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.operation-block {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+}
+
+.operation-block.expense {
+  border-left: 3px solid var(--red);
+}
+
+.operation-block.income {
+  border-left: 3px solid var(--green);
+}
+
 .modal-backdrop {
   position: fixed;
   inset: 0;
@@ -742,6 +839,19 @@ tr:hover td {
 
   .stat {
     flex: 1 1 145px;
+  }
+
+  .history-operation-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .history-detail-head {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .close-period-table .amount-input {
+    width: 118px;
   }
 
   .modal-backdrop {
