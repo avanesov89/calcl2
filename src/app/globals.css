@@ -507,9 +507,8 @@ td {
 th {
   color: var(--muted);
   font-size: 12px;
-  font-weight: 300;
+  font-weight: 500;
   text-align: left;
-  text-transform: uppercase;
   letter-spacing: 0;
 }
 
@@ -670,6 +669,19 @@ tr:hover td {
 .empty-state p:last-child,
 .preview-block p:last-child {
   margin-bottom: 0;
+}
+
+.bulk-close-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 0 0 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
 }
 
 .close-period-table {
@@ -846,6 +858,11 @@ tr:hover td {
   }
 
   .history-detail-head {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .bulk-close-bar {
     align-items: stretch;
     flex-direction: column;
   }

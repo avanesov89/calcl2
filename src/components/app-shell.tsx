@@ -657,15 +657,6 @@ function CharactersListScreen({
           </div>
           <div className="button-row section-actions">
             <button
-              className="secondary"
-              type="button"
-              onClick={() => onClosePeriods(selectedCloseCharacters)}
-              disabled={selectedCloseCharacters.length === 0}
-            >
-              <Save size={15} />
-              Закрыть период
-            </button>
-            <button
               className={isCharacterFormOpen ? "secondary active-secondary" : "secondary"}
               type="button"
               onClick={() => setIsCharacterFormOpen((isOpen) => !isOpen)}
@@ -687,82 +678,98 @@ function CharactersListScreen({
         {characters.length === 0 ? (
           <EmptyState text="Добавьте первого персонажа и укажите его текущие остатки, чтобы начать учёт." />
         ) : (
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th className="select-cell">
-                    <input
-                      type="checkbox"
-                      aria-label="Выбрать всех для закрытия периода"
-                      checked={allClosableSelected}
-                      disabled={closableRows.length === 0}
-                      onChange={toggleAllCloseSelection}
-                    />
-                  </th>
-                  <SortableTh active={sortKey === "nickname"} direction={sortDirection} onClick={() => toggleSort("nickname")}>
-                    Персонаж
-                  </SortableTh>
-                  <SortableTh active={sortKey === "balance"} direction={sortDirection} onClick={() => toggleSort("balance")} alignRight>
-                    Текущий остаток
-                  </SortableTh>
-                  <SortableTh active={sortKey === "interval"} direction={sortDirection} onClick={() => toggleSort("interval")} alignRight>
-                    Сегодня/интервал
-                  </SortableTh>
-                  <SortableTh active={sortKey === "week"} direction={sortDirection} onClick={() => toggleSort("week")} alignRight>
-                    Текущая неделя
-                  </SortableTh>
-                  <SortableTh active={sortKey === "expenses"} direction={sortDirection} onClick={() => toggleSort("expenses")} alignRight>
-                    Расходы недели
-                  </SortableTh>
-                  <SortableTh active={sortKey === "specialIncome"} direction={sortDirection} onClick={() => toggleSort("specialIncome")} alignRight>
-                    Крупные поступления
-                  </SortableTh>
-                  <SortableTh active={sortKey === "lastSnapshotAt"} direction={sortDirection} onClick={() => toggleSort("lastSnapshotAt")}>
-                    Последний остаток
-                  </SortableTh>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map(({ character, period, summary, lastInterval }) => {
-                  const hasUncounted = period ? hasOperationsAfterLastSnapshot(period.snapshots, period.operations) : false;
-                  const net = summary?.[selectedCurrency].netResult ?? 0;
-                  const intervalNet = lastInterval?.summary[selectedCurrency].netResult ?? 0;
+          <>
+            <div className="bulk-close-bar">
+              <span className="small">
+                Для закрытия выбрано: {selectedCloseCharacters.length} из {closableRows.length}
+              </span>
+              <button
+                className="secondary"
+                type="button"
+                onClick={() => onClosePeriods(selectedCloseCharacters)}
+                disabled={selectedCloseCharacters.length === 0}
+              >
+                <Save size={15} />
+                Закрыть период
+              </button>
+            </div>
+            <div className="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th className="select-cell">
+                      <input
+                        type="checkbox"
+                        aria-label="Выбрать всех для закрытия периода"
+                        checked={allClosableSelected}
+                        disabled={closableRows.length === 0}
+                        onChange={toggleAllCloseSelection}
+                      />
+                    </th>
+                    <SortableTh active={sortKey === "nickname"} direction={sortDirection} onClick={() => toggleSort("nickname")}>
+                      Персонаж
+                    </SortableTh>
+                    <SortableTh active={sortKey === "balance"} direction={sortDirection} onClick={() => toggleSort("balance")} alignRight>
+                      Текущий остаток
+                    </SortableTh>
+                    <SortableTh active={sortKey === "interval"} direction={sortDirection} onClick={() => toggleSort("interval")} alignRight>
+                      Сегодня/интервал
+                    </SortableTh>
+                    <SortableTh active={sortKey === "week"} direction={sortDirection} onClick={() => toggleSort("week")} alignRight>
+                      Текущая неделя
+                    </SortableTh>
+                    <SortableTh active={sortKey === "expenses"} direction={sortDirection} onClick={() => toggleSort("expenses")} alignRight>
+                      Расходы недели
+                    </SortableTh>
+                    <SortableTh active={sortKey === "specialIncome"} direction={sortDirection} onClick={() => toggleSort("specialIncome")} alignRight>
+                      Крупные поступления
+                    </SortableTh>
+                    <SortableTh active={sortKey === "lastSnapshotAt"} direction={sortDirection} onClick={() => toggleSort("lastSnapshotAt")}>
+                      Последний остаток
+                    </SortableTh>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map(({ character, period, summary, lastInterval }) => {
+                    const hasUncounted = period ? hasOperationsAfterLastSnapshot(period.snapshots, period.operations) : false;
+                    const net = summary?.[selectedCurrency].netResult ?? 0;
+                    const intervalNet = lastInterval?.summary[selectedCurrency].netResult ?? 0;
 
-                  return (
-                    <tr key={character.id}>
-                      <td className="select-cell">
-                        <input
-                          type="checkbox"
-                          aria-label={`Выбрать ${character.nickname} для закрытия периода`}
-                          checked={selectedCloseIds.includes(character.id)}
-                          disabled={!period}
-                          onChange={() => toggleCloseSelection(character.id)}
-                        />
-                      </td>
-                      <td>
-                        <button className="link-btn" type="button" onClick={() => onOpenCharacter(character)}>
-                          {character.nickname}
-                        </button>
-                        {character.server ? <div className="small">{character.server}</div> : null}
-                      </td>
-                      <td className="num-cell" title={formatInteger(character.currentBalances[selectedCurrency])}>
-                        {formatInteger(character.currentBalances[selectedCurrency])}
-                      </td>
-                      <td className={`num-cell ${resultClassName(intervalNet)}`}>{lastInterval ? formatSignedInteger(intervalNet) : "—"}</td>
-                      <td className={`num-cell ${resultClassName(net)}`}>{summary ? formatSignedInteger(net) : "—"}</td>
-                      <td className="num-cell">{summary ? formatInteger(summary[selectedCurrency].expenses) : "—"}</td>
-                      <td className="num-cell">{summary ? formatInteger(summary[selectedCurrency].specialIncome) : "—"}</td>
-                      <td>
-                        <span className={hasUncounted ? "pill amber" : "date-cell"}>{formatDateTime(character.lastSnapshotAt)}</span>
-                        {hasUncounted ? <div className="small">Есть операции после остатка</div> : null}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                    return (
+                      <tr key={character.id}>
+                        <td className="select-cell">
+                          <input
+                            type="checkbox"
+                            aria-label={`Выбрать ${character.nickname} для закрытия периода`}
+                            checked={selectedCloseIds.includes(character.id)}
+                            disabled={!period}
+                            onChange={() => toggleCloseSelection(character.id)}
+                          />
+                        </td>
+                        <td>
+                          <button className="link-btn" type="button" onClick={() => onOpenCharacter(character)}>
+                            {character.nickname}
+                          </button>
+                          {character.server ? <div className="small">{character.server}</div> : null}
+                        </td>
+                        <td className="num-cell" title={formatInteger(character.currentBalances[selectedCurrency])}>
+                          {formatInteger(character.currentBalances[selectedCurrency])}
+                        </td>
+                        <td className={`num-cell ${resultClassName(intervalNet)}`}>{lastInterval ? formatSignedInteger(intervalNet) : "—"}</td>
+                        <td className={`num-cell ${resultClassName(net)}`}>{summary ? formatSignedInteger(net) : "—"}</td>
+                        <td className="num-cell">{summary ? formatInteger(summary[selectedCurrency].expenses) : "—"}</td>
+                        <td className="num-cell">{summary ? formatInteger(summary[selectedCurrency].specialIncome) : "—"}</td>
+                        <td>
+                          <span className={hasUncounted ? "pill amber" : "date-cell"}>{formatDateTime(character.lastSnapshotAt)}</span>
+                          {hasUncounted ? <div className="small">Есть операции после остатка</div> : null}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </section>
     </>
