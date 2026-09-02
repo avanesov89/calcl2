@@ -723,45 +723,30 @@ tr:hover td {
 
 .history-details {
   display: grid;
-  gap: 14px;
-  padding: 14px;
+  gap: 10px;
+  padding: 12px;
   border-top: 1px solid var(--border);
 }
 
-.history-detail-head,
-.operation-block-title {
+.history-detail-head {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 10px;
 }
 
-.history-detail-title,
-.operation-block-title span:first-child {
+.history-detail-title {
   color: var(--text);
   font-weight: 700;
 }
 
-.history-operation-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
+.history-compact-table table {
+  font-size: 12.5px;
 }
 
-.operation-block {
-  min-width: 0;
-  padding: 12px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--panel);
-}
-
-.operation-block.expense {
-  border-left: 3px solid var(--red);
-}
-
-.operation-block.income {
-  border-left: 3px solid var(--green);
+.history-compact-table th,
+.history-compact-table td {
+  padding: 6px 7px;
 }
 
 .modal-backdrop {
@@ -851,10 +836,6 @@ tr:hover td {
 
   .stat {
     flex: 1 1 145px;
-  }
-
-  .history-operation-grid {
-    grid-template-columns: 1fr;
   }
 
   .history-detail-head {

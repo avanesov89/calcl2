@@ -911,6 +911,19 @@ function CharacterDetail({
                   {character.status === "archived" ? "Вернуть из архива" : "Архивировать"}
                 </button>
                 <button
+                  className="menu-item"
+                  type="button"
+                  role="menuitem"
+                  disabled={!period}
+                  onClick={() => {
+                    setIsCharacterMenuOpen(false);
+                    setModal({ type: "close", characters: [character] });
+                  }}
+                >
+                  <Save size={15} />
+                  Закрыть период
+                </button>
+                <button
                   className="menu-item danger"
                   type="button"
                   role="menuitem"
@@ -1087,14 +1100,54 @@ function HistoryScreen({
 }) {
   const [characterFilter, setCharacterFilter] = useState("all");
   const [expandedRows, setExpandedRows] = useState<string[]>([]);
-  const filteredCharacters = characterFilter === "all" ? characters : characters.filter((character) => character.id === characterFilter);
-  const periods = filteredCharacters
-    .flatMap((character) =>
-      character.periods
-        .filter((period) => period.status === "closed")
-        .map((period) => ({ character, period, summary: period.summary ?? calculatePeriodSummary(period.snapshots, period.operations) }))
-    )
-    .sort((left, right) => getPeriodSortTime(right.period) - getPeriodSortTime(left.period));
+  const filteredCharacters = useMemo(
+    () => (characterFilter === "all" ? characters : characters.filter((character) => character.id === characterFilter)),
+    [characterFilter, characters]
+  );
+  const periodGroups = useMemo(() => {
+    const groups = new Map<
+      string,
+      {
+        id: string;
+        plannedStartDate: string;
+        plannedEndDate: string;
+        sortTime: number;
+        items: Array<{ character: CharacterRecord; period: PeriodRecord; summary: PeriodSummary }>;
+      }
+    >();
+
+    for (const character of filteredCharacters) {
+      for (const period of character.periods) {
+        if (period.status !== "closed") {
+          continue;
+        }
+
+        const id = `${period.plannedStartDate}_${period.plannedEndDate}`;
+        const group = groups.get(id) ?? {
+          id,
+          plannedStartDate: period.plannedStartDate,
+          plannedEndDate: period.plannedEndDate,
+          sortTime: 0,
+          items: []
+        };
+
+        group.items.push({
+          character,
+          period,
+          summary: period.summary ?? calculatePeriodSummary(period.snapshots, period.operations)
+        });
+        group.sortTime = Math.max(group.sortTime, getPeriodSortTime(period));
+        groups.set(id, group);
+      }
+    }
+
+    return [...groups.values()]
+      .map((group) => ({
+        ...group,
+        summary: sumCurrencySummaries(group.items.map((item) => item.summary))
+      }))
+      .sort((left, right) => right.sortTime - left.sortTime);
+  }, [filteredCharacters]);
 
   function toggleExpanded(rowId: string) {
     setExpandedRows((current) => (current.includes(rowId) ? current.filter((id) => id !== rowId) : [...current, rowId]));
@@ -1122,72 +1175,98 @@ function HistoryScreen({
         </div>
         <CurrencyTabs value={selectedCurrency} onChange={setSelectedCurrency} compact />
       </div>
-      {periods.length === 0 ? (
+      {periodGroups.length === 0 ? (
         <p className="subtitle">История появится после закрытия первой недели.</p>
       ) : (
         <div className="table-wrap">
           <table>
             <thead>
               <tr>
-                <th>Ник</th>
                 <th>Дата</th>
-                <th className="right">Результат</th>
+                <th className="right">Общий расход</th>
+                <th className="right">Общий доход</th>
               </tr>
             </thead>
             <tbody>
-              {periods.map(({ character, period, summary }) => {
-                const rowId = `${character.id}-${period.id}`;
-                const currencySummary = summary[selectedCurrency];
-                const expanded = expandedRows.includes(rowId);
-                const expenses = sortOperations(period.operations.filter((operation) => operation.type === "expense"));
-                const income = sortOperations(period.operations.filter((operation) => operation.type === "special_income"));
+              {periodGroups.map((group) => {
+                const currencySummary = group.summary[selectedCurrency];
+                const expanded = expandedRows.includes(group.id);
 
                 return (
-                  <Fragment key={rowId}>
+                  <Fragment key={group.id}>
                     <tr className="history-main-row">
                       <td>
                         <button
                           className="accordion-trigger"
                           type="button"
                           aria-expanded={expanded}
-                          aria-controls={`history-details-${rowId}`}
-                          onClick={() => toggleExpanded(rowId)}
+                          aria-controls={`history-details-${group.id}`}
+                          onClick={() => toggleExpanded(group.id)}
                         >
                           {expanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-                          <span>{character.nickname}</span>
+                          <span>{formatYmdRange(group.plannedStartDate, group.plannedEndDate)}</span>
                         </button>
-                        {character.server ? <div className="small history-server">{character.server}</div> : null}
+                        <div className="small history-server">Персонажей: {group.items.length}</div>
                       </td>
-                      <td>{formatYmdRange(period.plannedStartDate, period.plannedEndDate)}</td>
-                      <td className={`num-cell ${resultClassName(currencySummary.netResult)}`}>
-                        {formatSignedInteger(currencySummary.netResult)}
-                      </td>
+                      <td className="num-cell">{formatInteger(currencySummary.expenses)}</td>
+                      <td className="num-cell">{formatInteger(currencySummary.grossEarned)}</td>
                     </tr>
                     {expanded ? (
                       <tr className="history-detail-row">
                         <td colSpan={3}>
-                          <div className="history-details" id={`history-details-${rowId}`}>
+                          <div className="history-details" id={`history-details-${group.id}`}>
                             <div className="history-detail-head">
                               <div>
-                                <div className="history-detail-title">{character.nickname}</div>
-                                <div className="small">
-                                  {formatYmdRange(period.plannedStartDate, period.plannedEndDate)}
-                                  {period.closedAt ? ` · закрыто ${formatDateTime(period.closedAt)}` : ""}
-                                </div>
+                                <div className="history-detail-title">{formatYmdRange(group.plannedStartDate, group.plannedEndDate)}</div>
+                                <div className="small">Статистика по персонажам в выбранной валюте.</div>
                               </div>
-                              <button className="copy-btn" type="button" onClick={() => setModal({ type: "period", character, period })}>
-                                Открыть расчёт
-                              </button>
                             </div>
-                            <SummaryStats
-                              balances={{ adena: summary.adena.closingBalance, lCoin: summary.lCoin.closingBalance }}
-                              summary={summary}
-                              selectedCurrency={selectedCurrency}
-                              includeAverage
-                            />
-                            <div className="history-operation-grid">
-                              <HistoryOperationBlock title="Расходы" operations={expenses} tone="expense" />
-                              <HistoryOperationBlock title="Доходы" operations={income} tone="income" />
+                            <div className="table-wrap history-compact-table">
+                              <table>
+                                <thead>
+                                  <tr>
+                                    <th>Ник</th>
+                                    <th className="right">Было</th>
+                                    <th className="right">Стало</th>
+                                    <th className="right">Доход</th>
+                                    <th className="right">Расход</th>
+                                    <th className="right">Поступления</th>
+                                    <th className="right">Результат</th>
+                                    <th>Детали</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {[...group.items]
+                                    .sort((left, right) => left.character.nickname.localeCompare(right.character.nickname, "ru-RU"))
+                                    .map(({ character, period, summary }) => {
+                                      const itemSummary = summary[selectedCurrency];
+                                      const average = summary.accountedDays ? Math.round(itemSummary.netResult / summary.accountedDays) : 0;
+
+                                      return (
+                                        <tr key={`${character.id}-${period.id}`}>
+                                          <td>
+                                            <b>{character.nickname}</b>
+                                            {character.server ? <div className="small">{character.server}</div> : null}
+                                          </td>
+                                          <td className="num-cell">{formatInteger(itemSummary.openingBalance)}</td>
+                                          <td className="num-cell">{formatInteger(itemSummary.closingBalance)}</td>
+                                          <td className="num-cell">{formatInteger(itemSummary.grossEarned)}</td>
+                                          <td className="num-cell">{formatInteger(itemSummary.expenses)}</td>
+                                          <td className="num-cell">{formatInteger(itemSummary.specialIncome)}</td>
+                                          <td className={`num-cell ${resultClassName(itemSummary.netResult)}`}>
+                                            {formatSignedInteger(itemSummary.netResult)}
+                                            <div className="small">{formatSignedInteger(average)}/день</div>
+                                          </td>
+                                          <td>
+                                            <button className="copy-btn" type="button" onClick={() => setModal({ type: "period", character, period })}>
+                                              Открыть
+                                            </button>
+                                          </td>
+                                        </tr>
+                                      );
+                                    })}
+                                </tbody>
+                              </table>
                             </div>
                           </div>
                         </td>
@@ -1196,53 +1275,6 @@ function HistoryScreen({
                   </Fragment>
                 );
               })}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </section>
-  );
-}
-
-function HistoryOperationBlock({
-  title,
-  operations,
-  tone
-}: {
-  title: string;
-  operations: OperationRecord[];
-  tone: "expense" | "income";
-}) {
-  return (
-    <section className={`operation-block ${tone}`}>
-      <div className="operation-block-title">
-        <span>{title}</span>
-        <span className="small">{operations.length}</span>
-      </div>
-      {operations.length === 0 ? (
-        <p className="subtitle">Операций нет.</p>
-      ) : (
-        <div className="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Дата</th>
-                <th>Валюта</th>
-                <th>Категория</th>
-                <th className="right">Сумма</th>
-                <th>Комментарий</th>
-              </tr>
-            </thead>
-            <tbody>
-              {operations.map((operation) => (
-                <tr key={operation.id}>
-                  <td className="date-cell">{formatDateTime(operation.occurredAt)}</td>
-                  <td>{operationCurrencyLabels[operation.currency]}</td>
-                  <td>{operation.category}</td>
-                  <td className="num-cell">{formatInteger(operation.amount)}</td>
-                  <td>{operation.comment || "—"}</td>
-                </tr>
-              ))}
             </tbody>
           </table>
         </div>
