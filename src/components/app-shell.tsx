@@ -63,7 +63,6 @@ import {
   formatInputDateTime,
   formatInteger,
   formatIntervalLabel,
-  formatShortDate,
   formatSignedInteger,
   formatYmdRange,
   operationCurrencyLabels,
@@ -73,7 +72,7 @@ import {
 } from "@/lib/format";
 
 type MainTab = "overview" | "characters" | "history";
-type SortKey = "nickname" | "balance" | "interval" | "week" | "expenses" | "specialIncome" | "lastSnapshotAt";
+type SortKey = "nickname" | "expenses" | "specialIncome" | "balance" | "week";
 type SortDirection = "asc" | "desc";
 
 type ModalState =
@@ -277,7 +276,6 @@ export default function AppShell() {
           characters={activeCharacters}
           selectedCurrency={selectedCurrency}
           setSelectedCurrency={setSelectedCurrency}
-          timezone={timezone}
           onOpenCharacter={(character) => {
             setSelectedCharacterId(character.id);
             setTab("overview");
@@ -539,7 +537,6 @@ function CharactersListScreen({
   characters,
   selectedCurrency,
   setSelectedCurrency,
-  timezone,
   onOpenCharacter,
   onClosePeriods,
   onCreateCharacter
@@ -547,7 +544,6 @@ function CharactersListScreen({
   characters: CharacterRecord[];
   selectedCurrency: Currency;
   setSelectedCurrency: (currency: Currency) => void;
-  timezone: string;
   onOpenCharacter: (character: CharacterRecord) => void;
   onClosePeriods: (characters: CharacterRecord[]) => void;
   onCreateCharacter: (input: CharacterFormInput) => Promise<void>;
@@ -577,10 +573,8 @@ function CharactersListScreen({
     const prepared = characters.map((character) => {
       const period = getOpenPeriod(character);
       const summary = period ? calculatePeriodSummary(period.snapshots, period.operations) : null;
-      const intervals = period ? buildIntervals(period.snapshots, period.operations, "preliminary", timezone) : [];
-      const lastInterval = intervals[intervals.length - 1];
 
-      return { character, period, summary, lastInterval };
+      return { character, period, summary };
     });
 
     return prepared.sort((left, right) => {
@@ -589,16 +583,12 @@ function CharactersListScreen({
         switch (sortKey) {
           case "balance":
             return item.character.currentBalances[selectedCurrency];
-          case "interval":
-            return item.lastInterval?.summary[selectedCurrency].netResult ?? 0;
           case "week":
             return item.summary?.[selectedCurrency].netResult ?? 0;
           case "expenses":
             return item.summary?.[selectedCurrency].expenses ?? 0;
           case "specialIncome":
             return item.summary?.[selectedCurrency].specialIncome ?? 0;
-          case "lastSnapshotAt":
-            return item.character.lastSnapshotAt.getTime();
           case "nickname":
           default:
             return item.character.nickname.toLocaleLowerCase("ru-RU");
@@ -613,7 +603,7 @@ function CharactersListScreen({
 
       return (Number(leftValue) - Number(rightValue)) * direction;
     });
-  }, [characters, selectedCurrency, sortDirection, sortKey, timezone]);
+  }, [characters, selectedCurrency, sortDirection, sortKey]);
   const closableRows = rows.filter(({ period }) => Boolean(period));
   const selectedCloseCharacters = rows
     .filter(({ character, period }) => Boolean(period) && selectedCloseIds.includes(character.id))
@@ -644,7 +634,7 @@ function CharactersListScreen({
         <div className="card-head">
           <div>
             <h2>Общий обзор</h2>
-            <p className="subtitle">Сумма всех активных персонажей и их текущих недель.</p>
+            <p className="subtitle">Сумма всех активных персонажей и их текущих периодов.</p>
           </div>
         </div>
         <CurrencyTabs value={selectedCurrency} onChange={setSelectedCurrency} />
@@ -696,31 +686,23 @@ function CharactersListScreen({
                     <SortableTh active={sortKey === "nickname"} direction={sortDirection} onClick={() => toggleSort("nickname")}>
                       Персонаж
                     </SortableTh>
-                    <SortableTh active={sortKey === "balance"} direction={sortDirection} onClick={() => toggleSort("balance")} alignRight>
-                      Текущий остаток
-                    </SortableTh>
-                    <SortableTh active={sortKey === "interval"} direction={sortDirection} onClick={() => toggleSort("interval")} alignRight>
-                      Сегодня/интервал
-                    </SortableTh>
-                    <SortableTh active={sortKey === "week"} direction={sortDirection} onClick={() => toggleSort("week")} alignRight>
-                      Текущая неделя
-                    </SortableTh>
                     <SortableTh active={sortKey === "expenses"} direction={sortDirection} onClick={() => toggleSort("expenses")} alignRight>
-                      Расходы недели
+                      Расходы
                     </SortableTh>
                     <SortableTh active={sortKey === "specialIncome"} direction={sortDirection} onClick={() => toggleSort("specialIncome")} alignRight>
                       Поступления
                     </SortableTh>
-                    <SortableTh active={sortKey === "lastSnapshotAt"} direction={sortDirection} onClick={() => toggleSort("lastSnapshotAt")}>
-                      Последний остаток
+                    <SortableTh active={sortKey === "balance"} direction={sortDirection} onClick={() => toggleSort("balance")} alignRight>
+                      Баланс
+                    </SortableTh>
+                    <SortableTh active={sortKey === "week"} direction={sortDirection} onClick={() => toggleSort("week")} alignRight>
+                      Доход
                     </SortableTh>
                   </tr>
                 </thead>
                 <tbody>
-                  {rows.map(({ character, period, summary, lastInterval }) => {
-                    const hasUncounted = period ? hasOperationsAfterLastSnapshot(period.snapshots, period.operations) : false;
+                  {rows.map(({ character, period, summary }) => {
                     const net = summary?.[selectedCurrency].netResult ?? 0;
-                    const intervalNet = lastInterval?.summary[selectedCurrency].netResult ?? 0;
 
                     return (
                       <tr key={character.id}>
@@ -739,17 +721,12 @@ function CharactersListScreen({
                           </button>
                           {character.server ? <div className="small">{character.server}</div> : null}
                         </td>
+                        <td className="num-cell money-expense">{summary ? formatInteger(summary[selectedCurrency].expenses) : "—"}</td>
+                        <td className="num-cell money-income">{summary ? formatInteger(summary[selectedCurrency].specialIncome) : "—"}</td>
                         <td className="num-cell" title={formatInteger(character.currentBalances[selectedCurrency])}>
                           {formatInteger(character.currentBalances[selectedCurrency])}
                         </td>
-                        <td className={`num-cell ${resultClassName(intervalNet)}`}>{lastInterval ? formatSignedInteger(intervalNet) : "—"}</td>
                         <td className={`num-cell ${resultClassName(net)}`}>{summary ? formatSignedInteger(net) : "—"}</td>
-                        <td className="num-cell money-expense">{summary ? formatInteger(summary[selectedCurrency].expenses) : "—"}</td>
-                        <td className="num-cell money-income">{summary ? formatInteger(summary[selectedCurrency].specialIncome) : "—"}</td>
-                        <td>
-                          <span className={hasUncounted ? "pill amber" : "date-cell"}>{formatShortDate(character.lastSnapshotAt)}</span>
-                          {hasUncounted ? <div className="small">Есть операции после остатка</div> : null}
-                        </td>
                       </tr>
                     );
                   })}
@@ -945,7 +922,7 @@ function CharacterDetail({
         {summary ? (
           <SummaryStats balances={character.currentBalances} summary={summary} selectedCurrency={selectedCurrency} includeAverage />
         ) : (
-          <p className="subtitle">Нет текущей недели.</p>
+          <p className="subtitle">Нет текущего периода.</p>
         )}
 
         {hasUncounted ? (
@@ -981,8 +958,8 @@ function CharacterDetail({
 
       <section className="card">
         <div className="card-head">
-          <h2>Операции текущей недели</h2>
-          <span className="small">{period ? formatYmdRange(period.plannedStartDate, period.plannedEndDate) : "Нет текущей недели"}</span>
+          <h2>Операции периода</h2>
+          <span className="small">{period ? formatCurrentPeriodRange(period) : "Нет текущего периода"}</span>
         </div>
         <div className="table-toolbar">
           <div className="row filter-row">
@@ -1041,7 +1018,7 @@ function CharacterDetail({
           />
         ) : null}
         {!period || operations.length === 0 ? (
-          <p className="subtitle">В текущей неделе пока нет расходов и поступлений.</p>
+          <p className="subtitle">В текущем периоде пока нет расходов и поступлений.</p>
         ) : (
           <div className="table-wrap">
             <table>
@@ -1509,7 +1486,7 @@ function SnapshotForm({
 
     try {
       if (!period) {
-        throw new Error("Нет текущей недели.");
+        throw new Error("Нет текущего периода.");
       }
 
       const input = {
@@ -1616,7 +1593,7 @@ function InlineOperationForm({
 
     try {
       if (!period) {
-        throw new Error("Нет текущей недели.");
+        throw new Error("Нет текущего периода.");
       }
 
       const input = {
@@ -1724,7 +1701,7 @@ function OperationForm({
 
     try {
       if (!period) {
-        throw new Error("Нет текущей недели.");
+        throw new Error("Нет текущего периода.");
       }
 
       const input = {
@@ -2083,7 +2060,7 @@ function SummaryStats({
 
   return (
     <div className="stat-row">
-      <Stat label="Текущий остаток" value={formatCompact(balances[selectedCurrency])} title={formatInteger(balances[selectedCurrency])} />
+      <Stat label="Текущий баланс" value={formatCompact(balances[selectedCurrency])} title={formatInteger(balances[selectedCurrency])} />
       <Stat label="Общий заработок" value={formatCompact(currencySummary.grossEarned)} title={formatInteger(currencySummary.grossEarned)} />
       <Stat label="Обычный фарм" value={formatCompact(currencySummary.regularFarm)} title={formatInteger(currencySummary.regularFarm)} />
       <Stat label="Поступления" value={formatCompact(currencySummary.specialIncome)} title={formatInteger(currencySummary.specialIncome)} />
@@ -2407,6 +2384,27 @@ function formatHistoryPeriodLabel(start: Date, end: Date, accountedDays: number)
   }
 
   return formatIntervalLabel(start, end);
+}
+
+function formatCurrentPeriodRange(period: PeriodRecord): string {
+  return `${formatDayMonth(parseYmdDate(period.plannedStartDate))} - ${formatDayMonth(new Date())}`;
+}
+
+function formatDayMonth(date: Date): string {
+  const day = String(date.getDate()).padStart(2, "0");
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+
+  return `${day}.${month}`;
+}
+
+function parseYmdDate(value: string): Date {
+  const [year, month, day] = value.split("-").map(Number);
+
+  if (!year || !month || !day) {
+    return new Date(value);
+  }
+
+  return new Date(year, month - 1, day);
 }
 
 function formatDaysLabel(days: number): string {
