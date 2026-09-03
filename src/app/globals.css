@@ -282,6 +282,18 @@ h2 {
 
 .character-head {
   align-items: center;
+  justify-content: flex-start;
+}
+
+.character-title-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.character-back {
+  margin-bottom: 4px;
+  font-size: 12px;
 }
 
 .menu-wrap {

@@ -805,6 +805,7 @@ function CharacterOverviewScreen({
       onDelete={onDelete}
       onDeleteOperation={onDeleteOperation}
       onSaveOperation={onSaveOperation}
+      onGoToCharacters={onGoToCharacters}
     />
   );
 }
@@ -818,7 +819,8 @@ function CharacterDetail({
   onArchive,
   onDelete,
   onDeleteOperation,
-  onSaveOperation
+  onSaveOperation,
+  onGoToCharacters
 }: {
   character: CharacterRecord;
   selectedCurrency: Currency;
@@ -829,6 +831,7 @@ function CharacterDetail({
   onDelete: (character: CharacterRecord) => Promise<void>;
   onDeleteOperation: (character: CharacterRecord, period: PeriodRecord, operation: OperationRecord) => Promise<void>;
   onSaveOperation: (character: CharacterRecord, period: PeriodRecord, input: OperationFormInput, operationId?: string) => Promise<void>;
+  onGoToCharacters: () => void;
 }) {
   const [operationTypeFilter, setOperationTypeFilter] = useState<"all" | OperationType>("all");
   const [operationCurrencyFilter, setOperationCurrencyFilter] = useState<"all" | OperationCurrency>("all");
@@ -853,68 +856,73 @@ function CharacterDetail({
       <section className="card">
         <div className="card-head character-head">
           <div>
-            <h2>{character.nickname}</h2>
+            <button className="link-btn character-back" type="button" onClick={onGoToCharacters}>
+              К списку персонажей
+            </button>
+            <div className="character-title-row">
+              <h2>{character.nickname}</h2>
+              <div className="menu-wrap">
+                <IconButton title="Действия персонажа" onClick={() => setIsCharacterMenuOpen((isOpen) => !isOpen)}>
+                  <MoreHorizontal size={17} />
+                </IconButton>
+                {isCharacterMenuOpen ? (
+                  <div className="menu-popover" role="menu">
+                    <button
+                      className="menu-item"
+                      type="button"
+                      role="menuitem"
+                      onClick={() => {
+                        setIsCharacterMenuOpen(false);
+                        setModal({ type: "character", character });
+                      }}
+                    >
+                      <Pencil size={15} />
+                      Редактировать
+                    </button>
+                    <button
+                      className="menu-item"
+                      type="button"
+                      role="menuitem"
+                      onClick={() => {
+                        setIsCharacterMenuOpen(false);
+                        void onArchive(character);
+                      }}
+                    >
+                      <Archive size={15} />
+                      {character.status === "archived" ? "Вернуть из архива" : "Архивировать"}
+                    </button>
+                    <button
+                      className="menu-item"
+                      type="button"
+                      role="menuitem"
+                      disabled={!period}
+                      onClick={() => {
+                        setIsCharacterMenuOpen(false);
+                        setModal({ type: "close", characters: [character] });
+                      }}
+                    >
+                      <Save size={15} />
+                      Закрыть период
+                    </button>
+                    <button
+                      className="menu-item danger"
+                      type="button"
+                      role="menuitem"
+                      onClick={() => {
+                        setIsCharacterMenuOpen(false);
+                        void onDelete(character);
+                      }}
+                    >
+                      <Trash2 size={15} />
+                      Удалить
+                    </button>
+                  </div>
+                ) : null}
+              </div>
+            </div>
             <p className="subtitle">
               {character.server ? `${character.server} · ` : ""}последний остаток {formatDateTime(character.lastSnapshotAt)}
             </p>
-          </div>
-          <div className="menu-wrap">
-            <IconButton title="Действия персонажа" onClick={() => setIsCharacterMenuOpen((isOpen) => !isOpen)}>
-              <MoreHorizontal size={17} />
-            </IconButton>
-            {isCharacterMenuOpen ? (
-              <div className="menu-popover" role="menu">
-                <button
-                  className="menu-item"
-                  type="button"
-                  role="menuitem"
-                  onClick={() => {
-                    setIsCharacterMenuOpen(false);
-                    setModal({ type: "character", character });
-                  }}
-                >
-                  <Pencil size={15} />
-                  Редактировать
-                </button>
-                <button
-                  className="menu-item"
-                  type="button"
-                  role="menuitem"
-                  onClick={() => {
-                    setIsCharacterMenuOpen(false);
-                    void onArchive(character);
-                  }}
-                >
-                  <Archive size={15} />
-                  {character.status === "archived" ? "Вернуть из архива" : "Архивировать"}
-                </button>
-                <button
-                  className="menu-item"
-                  type="button"
-                  role="menuitem"
-                  disabled={!period}
-                  onClick={() => {
-                    setIsCharacterMenuOpen(false);
-                    setModal({ type: "close", characters: [character] });
-                  }}
-                >
-                  <Save size={15} />
-                  Закрыть период
-                </button>
-                <button
-                  className="menu-item danger"
-                  type="button"
-                  role="menuitem"
-                  onClick={() => {
-                    setIsCharacterMenuOpen(false);
-                    void onDelete(character);
-                  }}
-                >
-                  <Trash2 size={15} />
-                  Удалить
-                </button>
-              </div>
-            ) : null}
           </div>
         </div>
 
@@ -1169,6 +1177,7 @@ function HistoryScreen({
               <tr>
                 <th>Дата</th>
                 <th className="right">Общий расход</th>
+                <th className="right">Поступления</th>
                 <th className="right">Дроп</th>
                 <th className="right">Результат</th>
               </tr>
@@ -1199,6 +1208,7 @@ function HistoryScreen({
                         </button>
                       </td>
                       <td className="num-cell money-expense">{formatInteger(currencySummary.expenses)}</td>
+                      <td className="num-cell money-income">{formatInteger(currencySummary.specialIncome)}</td>
                       <td className="num-cell">{formatInteger(currencySummary.regularFarm)}</td>
                       <td className={`num-cell ${resultClassName(currencySummary.netResult)}`}>
                         {formatSignedInteger(currencySummary.netResult)}
@@ -1206,7 +1216,7 @@ function HistoryScreen({
                     </tr>
                     {expanded ? (
                       <tr className="history-detail-row">
-                        <td colSpan={4}>
+                        <td colSpan={5}>
                           <div className="history-details" id={`history-details-${group.id}`}>
                             <div className="table-wrap history-compact-table">
                               <table>
@@ -2062,7 +2072,6 @@ function SummaryStats({
     <div className="stat-row">
       <Stat label="Текущий баланс" value={formatCompact(balances[selectedCurrency])} title={formatInteger(balances[selectedCurrency])} />
       <Stat label="Общий заработок" value={formatCompact(currencySummary.grossEarned)} title={formatInteger(currencySummary.grossEarned)} />
-      <Stat label="Обычный фарм" value={formatCompact(currencySummary.regularFarm)} title={formatInteger(currencySummary.regularFarm)} />
       <Stat label="Поступления" value={formatCompact(currencySummary.specialIncome)} title={formatInteger(currencySummary.specialIncome)} />
       <Stat label="Расходы" value={formatCompact(currencySummary.expenses)} title={formatInteger(currencySummary.expenses)} />
       <Stat
