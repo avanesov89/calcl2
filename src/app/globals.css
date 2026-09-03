@@ -285,14 +285,22 @@ h2 {
   justify-content: flex-start;
 }
 
+.character-head > div {
+  display: grid;
+}
+
 .character-title-row {
   display: inline-flex;
   align-items: center;
   gap: 4px;
 }
 
-.character-back {
-  margin-bottom: 4px;
+.character-head .character-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  width: fit-content;
+  margin-bottom: 8px;
   font-size: 12px;
 }
 

@@ -2,6 +2,7 @@
 
 import {
   Archive,
+  ArrowLeft,
   ChevronDown,
   ChevronRight,
   DoorOpen,
@@ -857,7 +858,8 @@ function CharacterDetail({
         <div className="card-head character-head">
           <div>
             <button className="link-btn character-back" type="button" onClick={onGoToCharacters}>
-              К списку персонажей
+              <ArrowLeft size={14} />
+              Назад к персонажам
             </button>
             <div className="character-title-row">
               <h2>{character.nickname}</h2>
