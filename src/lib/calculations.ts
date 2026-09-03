@@ -83,6 +83,20 @@ export function sumOperationsBetween(
   }, 0);
 }
 
+export function sumOperationsByType(operations: OperationRecord[], currency: Currency, type: OperationRecord["type"]): number {
+  return operations.reduce((sum, operation) => {
+    if (operation.type !== type) {
+      return sum;
+    }
+
+    if (operationCurrencyToKey(operation.currency) !== currency) {
+      return sum;
+    }
+
+    return sum + assertPositiveInteger(operation.amount, "Сумма операции");
+  }, 0);
+}
+
 export function calculateCurrencySummary(
   startBalance: number,
   endBalance: number,

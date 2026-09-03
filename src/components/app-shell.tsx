@@ -26,6 +26,7 @@ import {
   hasOperationsAfterLastSnapshot,
   sortOperations,
   sortSnapshots,
+  sumOperationsByType,
   sumCurrencySummaries
 } from "@/lib/calculations";
 import { auth, hasFirebaseConfig, requireFirebase } from "@/lib/firebase";
@@ -256,11 +257,8 @@ export default function AppShell() {
       </header>
 
       <nav className="tabs" aria-label="Основная навигация">
-        <button className={tab === "characters" ? "tab-btn active" : "tab-btn"} type="button" onClick={() => setTab("characters")}>
+        <button className={tab === "characters" || tab === "overview" ? "tab-btn active" : "tab-btn"} type="button" onClick={() => setTab("characters")}>
           Персонажи
-        </button>
-        <button className={tab === "overview" ? "tab-btn active" : "tab-btn"} type="button" onClick={() => setTab("overview")}>
-          Обзор
         </button>
         <button className={tab === "history" ? "tab-btn active" : "tab-btn"} type="button" onClick={() => setTab("history")}>
           История
@@ -573,8 +571,10 @@ function CharactersListScreen({
     const prepared = characters.map((character) => {
       const period = getOpenPeriod(character);
       const summary = period ? calculatePeriodSummary(period.snapshots, period.operations) : null;
+      const expenses = period ? sumOperationsByType(period.operations, selectedCurrency, "expense") : 0;
+      const specialIncome = period ? sumOperationsByType(period.operations, selectedCurrency, "special_income") : 0;
 
-      return { character, period, summary };
+      return { character, period, summary, expenses, specialIncome };
     });
 
     return prepared.sort((left, right) => {
@@ -586,9 +586,9 @@ function CharactersListScreen({
           case "week":
             return item.summary?.[selectedCurrency].netResult ?? 0;
           case "expenses":
-            return item.summary?.[selectedCurrency].expenses ?? 0;
+            return item.expenses;
           case "specialIncome":
-            return item.summary?.[selectedCurrency].specialIncome ?? 0;
+            return item.specialIncome;
           case "nickname":
           default:
             return item.character.nickname.toLocaleLowerCase("ru-RU");
@@ -701,7 +701,7 @@ function CharactersListScreen({
                   </tr>
                 </thead>
                 <tbody>
-                  {rows.map(({ character, period, summary }) => {
+                  {rows.map(({ character, period, summary, expenses, specialIncome }) => {
                     const net = summary?.[selectedCurrency].netResult ?? 0;
 
                     return (
@@ -721,8 +721,8 @@ function CharactersListScreen({
                           </button>
                           {character.server ? <div className="small">{character.server}</div> : null}
                         </td>
-                        <td className="num-cell money-expense">{summary ? formatInteger(summary[selectedCurrency].expenses) : "—"}</td>
-                        <td className="num-cell money-income">{summary ? formatInteger(summary[selectedCurrency].specialIncome) : "—"}</td>
+                        <td className="num-cell money-expense">{period ? formatInteger(expenses) : "—"}</td>
+                        <td className="num-cell money-income">{period ? formatInteger(specialIncome) : "—"}</td>
                         <td className="num-cell" title={formatInteger(character.currentBalances[selectedCurrency])}>
                           {formatInteger(character.currentBalances[selectedCurrency])}
                         </td>

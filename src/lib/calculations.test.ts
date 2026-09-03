@@ -5,7 +5,8 @@ import {
   calculatePeriodSummary,
   createNextPeriodOpeningBalances,
   hasOperationsAfterLastSnapshot,
-  isOperationInsideInterval
+  isOperationInsideInterval,
+  sumOperationsByType
 } from "./calculations";
 import { OperationRecord, SnapshotRecord } from "./types";
 
@@ -151,6 +152,18 @@ describe("farm calculations", () => {
         [operation("late", "expense", "adena", 1, addHours(baseDate, 1))]
       )
     ).toBe(true);
+  });
+
+  it("sums period operations outside balance intervals", () => {
+    const operations = [
+      operation("before", "expense", "adena", 10, addHours(baseDate, 1)),
+      operation("late", "expense", "adena", 25, addHours(baseDate, 36)),
+      operation("income", "special_income", "adena", 40, addHours(baseDate, 37)),
+      operation("other-currency", "expense", "l_coin", 7, addHours(baseDate, 38))
+    ];
+
+    expect(sumOperationsByType(operations, "adena", "expense")).toBe(35);
+    expect(sumOperationsByType(operations, "adena", "special_income")).toBe(40);
   });
 });
 
