@@ -1187,7 +1187,7 @@ function HistoryScreen({
         <p className="subtitle">История появится после закрытия первой недели.</p>
       ) : (
         <div className="table-wrap">
-          <table className="history-table">
+          <table>
             <thead>
               <tr>
                 <th>Дата</th>
@@ -1197,18 +1197,13 @@ function HistoryScreen({
               </tr>
             </thead>
             <tbody>
-              {periodGroups.map((group, index) => {
+              {periodGroups.map((group) => {
                 const currencySummary = group.summary[selectedCurrency];
                 const expanded = expandedRows.includes(group.id);
 
                 return (
                   <Fragment key={group.id}>
-                    {index > 0 ? (
-                      <tr className="history-gap-row" aria-hidden="true">
-                        <td colSpan={4} />
-                      </tr>
-                    ) : null}
-                    <tr className={expanded ? "history-main-row expanded" : "history-main-row"}>
+                    <tr className="history-main-row">
                       <td>
                         <button
                           className="accordion-trigger"
@@ -1242,9 +1237,9 @@ function HistoryScreen({
                                   <tr>
                                     <th>Ник</th>
                                     <th className="right">Было</th>
-                                    <th className="right">Дроп</th>
                                     <th className="right">Расход</th>
                                     <th className="right">Поступления</th>
+                                    <th className="right">Дроп</th>
                                     <th className="right">Результат</th>
                                   </tr>
                                 </thead>
@@ -1266,9 +1261,9 @@ function HistoryScreen({
                                             </span>
                                           </td>
                                           <td className="num-cell">{formatInteger(itemSummary.openingBalance)}</td>
-                                          <td className="num-cell">{formatInteger(itemSummary.regularFarm)}</td>
                                           <td className="num-cell money-expense">{formatInteger(itemSummary.expenses)}</td>
                                           <td className="num-cell money-income">{formatInteger(itemSummary.specialIncome)}</td>
+                                          <td className="num-cell money-income">{formatInteger(itemSummary.regularFarm)}</td>
                                           <td className={`num-cell ${resultClassName(itemSummary.netResult)}`}>
                                             {formatSignedInteger(itemSummary.netResult)}
                                             <div className="small">{formatSignedInteger(average)}/день</div>
