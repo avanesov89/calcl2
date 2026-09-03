@@ -108,7 +108,7 @@ type ClosePeriodSubmitItem = {
 };
 
 const expenseCategories = ["Расходки", "Синтезы"];
-const specialIncomeCategories = ["Дроп", "Продажа", "Другое"];
+const specialIncomeCategories = ["Продажа", "Награда", "Другое"];
 
 export default function AppShell() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -1041,7 +1041,7 @@ function CharacterDetail({
           />
         ) : null}
         {!period || operations.length === 0 ? (
-          <p className="subtitle">В текущей неделе пока нет расходов и крупных поступлений.</p>
+          <p className="subtitle">В текущей неделе пока нет расходов и поступлений.</p>
         ) : (
           <div className="table-wrap">
             <table>
@@ -1680,7 +1680,7 @@ function InlineOperationForm({
         </div>
       </div>
       {type === "special_income" ? (
-        <div className="steps">Поступление не меняет остаток само. Оно только отделяет крупный дроп/продажу от обычного фарма.</div>
+        <div className="steps">Поступление не меняет остаток само. Оно только отделяет продажу, награду или другое поступление от обычного фарма.</div>
       ) : null}
       {isAfterLastSnapshot ? (
         <div className="steps warn">Операция позже последнего остатка. Введите текущий остаток, чтобы она попала в расчёт.</div>
@@ -1707,9 +1707,10 @@ function OperationForm({
 }) {
   const categories = type === "expense" ? expenseCategories : specialIncomeCategories;
   const lastSnapshot = period ? getLastSnapshot(period.snapshots) : null;
+  const initialCategory = operation?.category && categories.includes(operation.category) ? operation.category : categories[0];
   const [currency, setCurrency] = useState<OperationCurrency>(operation?.currency ?? "adena");
   const [amount, setAmount] = useState(operation ? String(operation.amount) : "");
-  const [category, setCategory] = useState(operation?.category ?? categories[0]);
+  const [category, setCategory] = useState(initialCategory);
   const [occurredAt, setOccurredAt] = useState(formatInputDateTime(operation?.occurredAt));
   const [comment, setComment] = useState(operation?.comment ?? "");
   const [error, setError] = useState("");
@@ -1783,7 +1784,7 @@ function OperationForm({
       </div>
       {type === "special_income" ? (
         <div className="steps">
-          Поступление не меняет остаток само. Оно только отделяет крупный дроп/продажу от обычного фарма.
+          Поступление не меняет остаток само. Оно только отделяет продажу, награду или другое поступление от обычного фарма.
         </div>
       ) : null}
       {isAfterLastSnapshot ? (
