@@ -1187,7 +1187,7 @@ function HistoryScreen({
         <p className="subtitle">История появится после закрытия первой недели.</p>
       ) : (
         <div className="table-wrap">
-          <table>
+          <table className="history-table">
             <thead>
               <tr>
                 <th>Дата</th>
@@ -1197,13 +1197,18 @@ function HistoryScreen({
               </tr>
             </thead>
             <tbody>
-              {periodGroups.map((group) => {
+              {periodGroups.map((group, index) => {
                 const currencySummary = group.summary[selectedCurrency];
                 const expanded = expandedRows.includes(group.id);
 
                 return (
                   <Fragment key={group.id}>
-                    <tr className="history-main-row">
+                    {index > 0 ? (
+                      <tr className="history-gap-row" aria-hidden="true">
+                        <td colSpan={4} />
+                      </tr>
+                    ) : null}
+                    <tr className={expanded ? "history-main-row expanded" : "history-main-row"}>
                       <td>
                         <button
                           className="accordion-trigger"

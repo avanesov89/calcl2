@@ -732,39 +732,117 @@ tr:hover td {
   gap: 2px;
 }
 
-.history-main-row td {
+.history-table {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.history-table > thead th {
+  border-bottom: 0;
+}
+
+.history-table > tbody > .history-gap-row > td {
+  height: 12px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.history-table > tbody > .history-main-row > td {
+  padding: 12px 10px;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  background: var(--panel);
   vertical-align: middle;
 }
 
-.history-detail-row td {
-  padding: 0 8px 14px;
+.history-table > tbody > .history-main-row > td:first-child {
+  border-left: 1px solid var(--border);
+}
+
+.history-table > tbody > .history-main-row > td:last-child {
+  border-right: 1px solid var(--border);
+}
+
+.history-table > tbody > .history-main-row.expanded > td:first-child {
+  border-radius: 8px 0 0 0;
+}
+
+.history-table > tbody > .history-main-row.expanded > td:last-child {
+  border-radius: 0 8px 0 0;
+}
+
+.history-table > tbody > .history-main-row:not(.expanded) > td:first-child {
+  border-radius: 8px 0 0 8px;
+}
+
+.history-table > tbody > .history-main-row:not(.expanded) > td:last-child {
+  border-radius: 0 8px 8px 0;
+}
+
+.history-table > tbody > .history-main-row:hover > td {
   background: var(--hover-bg);
+}
+
+.history-table > tbody > .history-detail-row > td {
+  padding: 0 10px 12px;
+  border-right: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  border-left: 1px solid var(--border);
+  border-radius: 0 0 8px 8px;
+  background: var(--panel);
+}
+
+.history-table > tbody > .history-detail-row:hover > td {
+  background: var(--panel);
 }
 
 .history-details {
   display: grid;
-  gap: 10px;
-  padding: 12px;
+  padding: 10px 0 0;
   border-top: 1px solid var(--border);
 }
 
+.history-compact-table {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+  overflow: hidden;
+}
+
 .history-compact-table table {
+  border-collapse: collapse;
   font-size: 12.5px;
+}
+
+.history-compact-table th {
+  background: var(--bg);
 }
 
 .history-compact-table th,
 .history-compact-table td {
-  padding: 6px 7px;
+  padding: 8px 10px;
+}
+
+.history-compact-table tbody tr:nth-child(even) td {
+  background: var(--hover-bg);
+}
+
+.history-compact-table tbody tr:hover td {
+  background: var(--bg);
 }
 
 .history-character-cell {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
 }
 
 .history-character-cell .icon-btn {
-  padding: 1px 4px;
+  min-width: 24px;
+  min-height: 24px;
+  padding: 3px;
+  color: var(--muted);
 }
 
 .modal-backdrop {
