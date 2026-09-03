@@ -506,7 +506,7 @@ th,
 td {
   padding: 7px 8px;
   border-bottom: 1px solid var(--border);
-  vertical-align: top;
+  vertical-align: middle;
 }
 
 th {
@@ -757,10 +757,14 @@ tr:hover td {
   padding: 6px 7px;
 }
 
-.history-detail-btn {
-  display: flex;
-  width: fit-content;
-  margin-top: 5px;
+.history-character-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.history-character-cell .icon-btn {
+  padding: 1px 4px;
 }
 
 .modal-backdrop {

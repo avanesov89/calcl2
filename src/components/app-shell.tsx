@@ -5,6 +5,7 @@ import {
   ChevronDown,
   ChevronRight,
   DoorOpen,
+  Eye,
   Minus,
   MoreHorizontal,
   Pencil,
@@ -1192,6 +1193,7 @@ function HistoryScreen({
                 <th>Дата</th>
                 <th className="right">Общий расход</th>
                 <th className="right">Общий доход</th>
+                <th className="right">Результат</th>
               </tr>
             </thead>
             <tbody>
@@ -1221,10 +1223,13 @@ function HistoryScreen({
                       </td>
                       <td className="num-cell money-expense">{formatInteger(currencySummary.expenses)}</td>
                       <td className="num-cell money-income">{formatInteger(currencySummary.grossEarned)}</td>
+                      <td className={`num-cell ${resultClassName(currencySummary.netResult)}`}>
+                        {formatSignedInteger(currencySummary.netResult)}
+                      </td>
                     </tr>
                     {expanded ? (
                       <tr className="history-detail-row">
-                        <td colSpan={3}>
+                        <td colSpan={4}>
                           <div className="history-details" id={`history-details-${group.id}`}>
                             <div className="table-wrap history-compact-table">
                               <table>
@@ -1249,11 +1254,12 @@ function HistoryScreen({
                                       return (
                                         <tr key={`${character.id}-${period.id}`}>
                                           <td>
-                                            <b>{character.nickname}</b>
-                                            {character.server ? <div className="small">{character.server}</div> : null}
-                                            <button className="copy-btn history-detail-btn" type="button" onClick={() => setModal({ type: "period", character, period })}>
-                                              Детали
-                                            </button>
+                                            <span className="history-character-cell">
+                                              <b>{character.nickname}</b>
+                                              <IconButton title="Детали" onClick={() => setModal({ type: "period", character, period })}>
+                                                <Eye size={14} />
+                                              </IconButton>
+                                            </span>
                                           </td>
                                           <td className="num-cell">{formatInteger(itemSummary.openingBalance)}</td>
                                           <td className="num-cell">{formatInteger(itemSummary.closingBalance)}</td>
