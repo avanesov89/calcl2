@@ -5,7 +5,7 @@ import {
   ChevronDown,
   ChevronRight,
   DoorOpen,
-  Eye,
+  FileText,
   Minus,
   MoreHorizontal,
   Pencil,
@@ -1222,7 +1222,7 @@ function HistoryScreen({
                         </button>
                       </td>
                       <td className="num-cell money-expense">{formatInteger(currencySummary.expenses)}</td>
-                      <td className="num-cell money-income">{formatInteger(currencySummary.grossEarned)}</td>
+                      <td className="num-cell">{formatInteger(currencySummary.grossEarned)}</td>
                       <td className={`num-cell ${resultClassName(currencySummary.netResult)}`}>
                         {formatSignedInteger(currencySummary.netResult)}
                       </td>
@@ -1257,7 +1257,7 @@ function HistoryScreen({
                                             <span className="history-character-cell">
                                               <b>{character.nickname}</b>
                                               <IconButton title="Детали" onClick={() => setModal({ type: "period", character, period })}>
-                                                <Eye size={14} />
+                                                <FileText size={14} />
                                               </IconButton>
                                             </span>
                                           </td>
