@@ -392,8 +392,8 @@ export default function AppShell() {
                 await Promise.all(items.map((item) => closePeriod(currentUser.uid, item.character, item.period, item.input)));
                 await reloadWithNotice(
                   items.length === 1
-                    ? "Период завершён, следующий начат автоматически."
-                    : `Период завершён для ${items.length} персонажей.`
+                    ? "Период завершён, остаток перенесён в следующий период."
+                    : `Период завершён для ${items.length} персонажей, остатки перенесены.`
                 );
                 setModal(null);
               }}
@@ -1924,7 +1924,7 @@ function ClosePeriodForm({
 
   return (
     <form onSubmit={submit}>
-      <ModalHead title="Закрыть период" onCancel={onCancel} />
+      <ModalHead title="Закрыть период и перенести остаток" onCancel={onCancel} />
       <div className="row">
         <div className="field">
           <label htmlFor="close-date">Дата и время</label>
@@ -1944,8 +1944,8 @@ function ClosePeriodForm({
             <thead>
               <tr>
                 <th>Ник</th>
-                <th className="right">Адена</th>
-                <th className="right">L-монеты</th>
+                <th className="right">Адена на старт</th>
+                <th className="right">L-монеты на старт</th>
                 <th className="right">Заработано</th>
                 <th className="right">Поступления</th>
                 <th className="right">Расходы</th>
@@ -1997,12 +1997,12 @@ function ClosePeriodForm({
           <SummaryStats balances={aggregateBalances} summary={aggregateSummary} selectedCurrency={selectedCurrency} includeAverage />
           <p>{summarizeCurrency(aggregateSummary[selectedCurrency])}</p>
           <p className="small">
-            Выбрано персонажей: {previewRows.length}; учтено дней суммарно: {aggregateSummary.accountedDays}.
+            Выбрано персонажей: {previewRows.length}; учтено дней суммарно: {aggregateSummary.accountedDays}. Эти остатки станут стартовыми в следующем периоде.
           </p>
         </div>
       ) : null}
       <div className="err">{error}</div>
-      <FormActions onCancel={onCancel} saving={saving} submitLabel="Закрыть выбранные" />
+      <FormActions onCancel={onCancel} saving={saving} submitLabel="Закрыть и перенести" />
     </form>
   );
 }

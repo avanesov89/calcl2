@@ -456,7 +456,7 @@ export async function closePeriod(
     kind: "initial",
     balances,
     capturedAt: Timestamp.fromDate(nextPeriodStart),
-    comment: "Остаток перенесен из завершенной недели",
+    comment: "Остаток перенесён из завершённого периода",
     createdAt: now,
     updatedAt: now
   });
