@@ -1192,7 +1192,7 @@ function HistoryScreen({
               <tr>
                 <th>Дата</th>
                 <th className="right">Общий расход</th>
-                <th className="right">Общий доход</th>
+                <th className="right">Дроп</th>
                 <th className="right">Результат</th>
               </tr>
             </thead>
@@ -1222,7 +1222,7 @@ function HistoryScreen({
                         </button>
                       </td>
                       <td className="num-cell money-expense">{formatInteger(currencySummary.expenses)}</td>
-                      <td className="num-cell">{formatInteger(currencySummary.grossEarned)}</td>
+                      <td className="num-cell">{formatInteger(currencySummary.regularFarm)}</td>
                       <td className={`num-cell ${resultClassName(currencySummary.netResult)}`}>
                         {formatSignedInteger(currencySummary.netResult)}
                       </td>
@@ -1237,8 +1237,7 @@ function HistoryScreen({
                                   <tr>
                                     <th>Ник</th>
                                     <th className="right">Было</th>
-                                    <th className="right">Стало</th>
-                                    <th className="right">Доход</th>
+                                    <th className="right">Дроп</th>
                                     <th className="right">Расход</th>
                                     <th className="right">Поступления</th>
                                     <th className="right">Результат</th>
@@ -1262,8 +1261,7 @@ function HistoryScreen({
                                             </span>
                                           </td>
                                           <td className="num-cell">{formatInteger(itemSummary.openingBalance)}</td>
-                                          <td className="num-cell">{formatInteger(itemSummary.closingBalance)}</td>
-                                          <td className="num-cell money-income">{formatInteger(itemSummary.grossEarned)}</td>
+                                          <td className="num-cell">{formatInteger(itemSummary.regularFarm)}</td>
                                           <td className="num-cell money-expense">{formatInteger(itemSummary.expenses)}</td>
                                           <td className="num-cell money-income">{formatInteger(itemSummary.specialIncome)}</td>
                                           <td className={`num-cell ${resultClassName(itemSummary.netResult)}`}>
