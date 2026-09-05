@@ -65,6 +65,7 @@ import {
   formatInputDateTime,
   formatInteger,
   formatIntervalLabel,
+  formatShortDate,
   formatSignedInteger,
   formatYmdRange,
   operationCurrencyLabels,
@@ -74,7 +75,7 @@ import {
 } from "@/lib/format";
 
 type MainTab = "overview" | "characters" | "history";
-type SortKey = "nickname" | "expenses" | "specialIncome" | "balance" | "week";
+type SortKey = "nickname" | "expenses" | "specialIncome" | "balance" | "week" | "lastSnapshotAt";
 type SortDirection = "asc" | "desc";
 
 type ModalState =
@@ -590,6 +591,8 @@ function CharactersListScreen({
             return item.expenses;
           case "specialIncome":
             return item.specialIncome;
+          case "lastSnapshotAt":
+            return item.character.lastSnapshotAt.getTime();
           case "nickname":
           default:
             return item.character.nickname.toLocaleLowerCase("ru-RU");
@@ -699,6 +702,9 @@ function CharactersListScreen({
                     <SortableTh active={sortKey === "week"} direction={sortDirection} onClick={() => toggleSort("week")} alignRight>
                       Доход
                     </SortableTh>
+                    <SortableTh active={sortKey === "lastSnapshotAt"} direction={sortDirection} onClick={() => toggleSort("lastSnapshotAt")}>
+                      Обновление
+                    </SortableTh>
                   </tr>
                 </thead>
                 <tbody>
@@ -728,6 +734,9 @@ function CharactersListScreen({
                           {formatInteger(character.currentBalances[selectedCurrency])}
                         </td>
                         <td className={`num-cell ${resultClassName(net)}`}>{summary ? formatSignedInteger(net) : "—"}</td>
+                        <td>
+                          <span className="date-cell">{formatShortDate(character.lastSnapshotAt)}</span>
+                        </td>
                       </tr>
                     );
                   })}
